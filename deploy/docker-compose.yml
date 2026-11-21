@@ -1,0 +1,31 @@
+# Despliegue en el droplet, junto al sistema de inventario (comparten el Caddy de este).
+# Sin puertos publicados: solo el Caddy del inventario llega a este contenedor,
+# por la red que ya existe (sistema-inventario_app-net).
+#
+# Requiere un archivo .env en esta carpeta con:  ADMIN_PASSWORD=...
+# (solo se usa para crear el administrador la primera vez, cuando no hay usuarios)
+services:
+  pitazo-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pitazo-app
+    restart: unless-stopped
+    environment:
+      ADMIN_USER: admin
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      TZ: America/Bogota
+    volumes:
+      - pitazo_data:/srv/backend/data
+    networks:
+      - inventario-net
+    mem_limit: 256m
+
+networks:
+  inventario-net:
+    external: true
+    name: sistema-inventario_app-net
+
+volumes:
+  pitazo_data:
+    name: pitazo_data
