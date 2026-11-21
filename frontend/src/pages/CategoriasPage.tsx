@@ -82,8 +82,8 @@ export default function CategoriasPage() {
                 </div>
               </div>
               {c.limita_anio && <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">≤ {c.anio_minimo}</span>}
-              <button className="btn btn-sec !px-2 !py-1.5" onClick={() => editar(c)}><Pencil size={14} /></button>
-              <button className="btn btn-sec !px-2 !py-1.5" onClick={() => confirm(`¿Eliminar la categoría ${c.nombre}?`) && borrar.mutate(c.id)}><Trash2 size={14} /></button>
+              <button className="btn btn-sec btn-icon" onClick={() => editar(c)}><Pencil size={14} /></button>
+              <button className="btn btn-sec btn-icon" onClick={() => confirm(`¿Eliminar la categoría ${c.nombre}?`) && borrar.mutate(c.id)}><Trash2 size={14} /></button>
             </div>
           ))}
         </div>

@@ -22,3 +22,7 @@ secret.key
 *.log
 *.out
 .claude/
+
+# Pruebas de navegador
+e2e/node_modules/
+e2e/shots/

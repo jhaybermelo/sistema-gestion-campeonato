@@ -87,8 +87,8 @@ export default function UsuariosPage() {
                 <div className="text-xs text-slate-500">@{u.usuario}{!u.activo && ' · desactivado'}</div>
               </div>
               <span className={clsx('rounded-full px-3 py-1 text-xs font-semibold', u.rol === 'admin' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800')}>{ROL[u.rol]}</span>
-              <button className="btn btn-sec !px-2 !py-1.5" title="Editar o restablecer contraseña" onClick={() => editar(u)}>{<Pencil size={14} />}<KeyRound size={14} /></button>
-              <button className="btn btn-sec !px-2 !py-1.5" disabled={u.id === yo?.id} title="Eliminar" onClick={() => confirm(`¿Eliminar a ${u.nombre}?`) && borrar.mutate(u.id)}><Trash2 size={14} /></button>
+              <button className="btn btn-sec btn-icon" title="Editar o restablecer contraseña" onClick={() => editar(u)}>{<Pencil size={14} />}<KeyRound size={14} /></button>
+              <button className="btn btn-sec btn-icon" disabled={u.id === yo?.id} title="Eliminar" onClick={() => confirm(`¿Eliminar a ${u.nombre}?`) && borrar.mutate(u.id)}><Trash2 size={14} /></button>
             </div>
           ))}
         </div>

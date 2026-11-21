@@ -50,11 +50,11 @@ function NuevoPartido({ onClose }: { onClose: () => void }) {
   const valido = local && visit && local !== visit && fecha
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="card w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-30 flex overflow-y-auto bg-black/50 p-3 sm:p-4" onClick={onClose}>
+      <div className="card m-auto w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-bold">Nuevo partido</h2>
-          <button onClick={onClose} className="rounded p-1 hover:bg-slate-100"><X size={18} /></button>
+          <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded hover:bg-slate-100"><X size={18} /></button>
         </div>
         {activos.length < 2 ? (
           <p className="text-sm text-slate-600">

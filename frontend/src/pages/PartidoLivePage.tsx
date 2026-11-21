@@ -72,7 +72,7 @@ function FormJugador({ lado, onAdd, onClose }: { lado: LadoPartido; onAdd: (d: o
       <input className="input !w-28" type="number" placeholder={lado.limita_anio ? `Año ≤ ${lado.anio_minimo}` : 'Año nac.'} value={anio} onChange={(e) => setAnio(e.target.value)} />
       <input className="input !w-28" placeholder="Documento" value={documento} onChange={(e) => setDocumento(e.target.value)} />
       <button className="btn btn-pri !py-1.5">Agregar</button>
-      <button type="button" className="btn btn-sec !py-1.5" onClick={onClose}>Cancelar</button>
+      <button type="button" className="btn btn-sec !py-2.5 sm:!py-1.5" onClick={onClose}>Cancelar</button>
     </form>
   )
 }
@@ -92,7 +92,7 @@ function PanelEquipo({ p, lado, activo, onEvento, onConvocar, onAgregar }: Panel
   const faltas = lado.faltas[String(p.periodo)] ?? 0
   const limite = faltas >= p.limite_faltas
   const lista = editando ? lado.jugadores : lado.jugadores.filter((j) => j.convocado)
-  const btn = 'flex h-9 min-w-9 items-center justify-center rounded-md px-1.5 text-sm font-bold transition active:scale-90 disabled:opacity-25'
+  const btn = 'flex h-11 w-full items-center justify-center rounded-md text-sm font-bold transition active:scale-90 disabled:opacity-25 sm:h-9 sm:w-9'
 
   return (
     <div className="card">
@@ -121,7 +121,7 @@ function PanelEquipo({ p, lado, activo, onEvento, onConvocar, onAgregar }: Panel
               </span>
             </span>
             {!editando && (
-              <div className="flex gap-1">
+              <div className="grid w-full grid-cols-6 gap-1.5 sm:flex sm:w-auto sm:gap-1">
                 <button disabled={!activo} title="Gol" className={clsx(btn, 'bg-slate-900 text-white')} onClick={() => onEvento('gol', lado.id, j)}>⚽</button>
                 <button disabled={!activo} title="Falta" className={clsx(btn, 'bg-slate-200 text-slate-700')} onClick={() => onEvento('falta', lado.id, j)}>F</button>
                 <button disabled={!activo} title="Tarjeta amarilla" className={clsx(btn, 'bg-yellow-300 text-yellow-900')} onClick={() => onEvento('amarilla', lado.id, j)}>A</button>
@@ -141,15 +141,15 @@ function PanelEquipo({ p, lado, activo, onEvento, onConvocar, onAgregar }: Panel
 
       <div className="mt-3 flex flex-wrap gap-2">
         {!editando && (
-          <button disabled={!activo} className="btn btn-sec !py-1.5" onClick={() => onEvento('falta', lado.id, null)}>
+          <button disabled={!activo} className="btn btn-sec !py-2.5 sm:!py-1.5" onClick={() => onEvento('falta', lado.id, null)}>
             + Falta del equipo
           </button>
         )}
-        <button className="btn btn-sec !py-1.5" onClick={() => setEditando(!editando)}>
+        <button className="btn btn-sec !py-2.5 sm:!py-1.5" onClick={() => setEditando(!editando)}>
           <Users size={14} /> {editando ? 'Listo' : 'Editar planilla'}
         </button>
         {editando && (
-          <button className="btn btn-sec !py-1.5" onClick={() => setNuevo(true)}><UserPlus size={14} /> Jugador nuevo</button>
+          <button className="btn btn-sec !py-2.5 sm:!py-1.5" onClick={() => setNuevo(true)}><UserPlus size={14} /> Jugador nuevo</button>
         )}
       </div>
       {editando && <p className="mt-1 text-xs text-slate-500">Marca solo a los jugadores que asistieron al partido.</p>}
@@ -257,7 +257,7 @@ export default function PartidoLivePage() {
 
   return (
     <div className="space-y-4">
-      <Link to="/partidos" className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900"><ArrowLeft size={16} /> Partidos</Link>
+      <Link to="/partidos" className="inline-flex items-center gap-1 py-2 text-sm font-medium text-slate-600 hover:text-slate-900"><ArrowLeft size={16} /> Partidos</Link>
 
       {/* Marcador y cronómetro */}
       <div className="rounded-2xl bg-slate-900 p-4 text-white shadow-lg sm:p-6">
@@ -329,12 +329,12 @@ export default function PartidoLivePage() {
           {[...p.eventos].reverse().map((ev) => {
             const equipo = ev.equipo_id === p.local.id ? p.local.nombre : p.visitante.nombre
             return (
-              <div key={ev.id} className="flex items-center gap-3 py-1.5 text-sm">
-                <span className="w-20 font-mono text-slate-500">{ev.periodo}T {fmtTiempo(ev.segundo)}</span>
-                <span className="w-40 font-medium">{EVENTO[ev.tipo].icono} {EVENTO[ev.tipo].nombre}</span>
-                <span className="flex-1">{ev.nombre ? `#${ev.numero} ${ev.nombre}` : '(equipo)'} <span className="text-slate-400">— {equipo}</span></span>
+              <div key={ev.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-2 text-sm">
+                <span className="w-20 shrink-0 font-mono text-slate-500">{ev.periodo}T {fmtTiempo(ev.segundo)}</span>
+                <span className="font-medium sm:w-40">{EVENTO[ev.tipo].icono} {EVENTO[ev.tipo].nombre}</span>
+                <span className="order-3 basis-full sm:order-none sm:basis-auto sm:flex-1">{ev.nombre ? `#${ev.numero} ${ev.nombre}` : '(equipo)'} <span className="text-slate-400">— {equipo}</span></span>
                 {!fin && (
-                  <button title="Eliminar evento" className="rounded p-1 text-red-500 hover:bg-red-50"
+                  <button title="Eliminar evento" className="order-2 ml-auto flex h-10 w-10 items-center justify-center rounded text-red-500 hover:bg-red-50 sm:order-none sm:h-8 sm:w-8"
                     onClick={() => confirm('¿Eliminar este evento?') && deshacer.mutate(ev.id)}><X size={16} /></button>
                 )}
               </div>

@@ -24,13 +24,13 @@ export default function EstadisticasPage() {
       <div className="card">
         <h2 className="mb-3 text-xl font-bold">⚽ Goleadores</h2>
         <table className="w-full text-sm">
-          <thead className="text-left text-xs text-slate-500"><tr><th className="p-2">#</th><th className="p-2">Jugador</th><th className="p-2">Equipo</th><th className="p-2 text-center">Goles</th></tr></thead>
+          <thead className="text-left text-xs text-slate-500"><tr><th className="p-2">#</th><th className="p-2">Jugador</th><th className="hidden p-2 sm:table-cell">Equipo</th><th className="p-2 text-center">Goles</th></tr></thead>
           <tbody>
             {goleadores.map((r, i) => (
               <tr key={r.jugador_id} className="border-t border-slate-100">
                 <td className="p-2 text-slate-400">{i + 1}</td>
-                <td className="p-2 font-medium">#{r.numero} {r.nombre}</td>
-                <td className="p-2 text-slate-500">{r.equipo}</td>
+                <td className="p-2 font-medium">#{r.numero} {r.nombre}<div className="text-xs font-normal text-slate-500 sm:hidden">{r.equipo}</div></td>
+                <td className="hidden p-2 text-slate-500 sm:table-cell">{r.equipo}</td>
                 <td className="p-2 text-center text-base font-extrabold">{r.goles}</td>
               </tr>
             ))}
@@ -41,12 +41,12 @@ export default function EstadisticasPage() {
       <div className="card">
         <h2 className="mb-3 text-xl font-bold">Tarjetas</h2>
         <table className="w-full text-sm">
-          <thead className="text-left text-xs text-slate-500"><tr><th className="p-2">Jugador</th><th className="p-2">Equipo</th><th className="p-2 text-center">🟨</th><th className="p-2 text-center">🟦</th><th className="p-2 text-center">🟥</th></tr></thead>
+          <thead className="text-left text-xs text-slate-500"><tr><th className="p-2">Jugador</th><th className="hidden p-2 sm:table-cell">Equipo</th><th className="p-2 text-center">🟨</th><th className="p-2 text-center">🟦</th><th className="p-2 text-center">🟥</th></tr></thead>
           <tbody>
             {tarjetas.map((r) => (
               <tr key={r.jugador_id} className="border-t border-slate-100">
-                <td className="p-2 font-medium">#{r.numero} {r.nombre}</td>
-                <td className="p-2 text-slate-500">{r.equipo}</td>
+                <td className="p-2 font-medium">#{r.numero} {r.nombre}<div className="text-xs font-normal text-slate-500 sm:hidden">{r.equipo}</div></td>
+                <td className="hidden p-2 text-slate-500 sm:table-cell">{r.equipo}</td>
                 <td className="p-2 text-center">{r.amarillas || ''}</td>
                 <td className="p-2 text-center">{r.azules || ''}</td>
                 <td className="p-2 text-center">{r.rojas || ''}</td>

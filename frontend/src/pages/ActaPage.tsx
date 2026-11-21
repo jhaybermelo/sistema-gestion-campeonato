@@ -11,7 +11,7 @@ function Planilla({ lado, p }: { lado: LadoPartido; p: PartidoDetalle }) {
   return (
     <section className="mb-5 break-inside-avoid">
       <h3 className="mb-1 font-bold">{lado.nombre} <span className="font-normal">— Delegado: {lado.delegado || '________________'}</span></h3>
-      <table className="w-full border-collapse text-xs">
+      <div className="overflow-x-auto"><table className="w-full border-collapse text-xs">
         <thead>
           <tr className="bg-slate-100">
             <th className={celda}>N°</th><th className={`${celda} text-left`}>Jugador</th><th className={`${celda} text-left`}>Documento</th>
@@ -29,7 +29,7 @@ function Planilla({ lado, p }: { lado: LadoPartido; p: PartidoDetalle }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       <p className="mt-1 text-xs">
         Faltas por tiempo: {Array.from({ length: p.num_tiempos }, (_, i) => `${i + 1}º T: ${lado.faltas[String(i + 1)] ?? 0}`).join('  ·  ')}
       </p>
@@ -60,7 +60,7 @@ export default function ActaPage() {
 
       <section className="mb-6 break-inside-avoid">
         <h3 className="mb-1 font-bold">Eventos</h3>
-        <table className="w-full border-collapse text-xs">
+        <div className="overflow-x-auto"><table className="w-full border-collapse text-xs">
           <thead><tr className="bg-slate-100"><th className={celda}>Tiempo</th><th className={`${celda} text-left`}>Evento</th><th className={`${celda} text-left`}>Jugador</th><th className={`${celda} text-left`}>Equipo</th></tr></thead>
           <tbody>
             {p.eventos.map((ev) => (
@@ -72,7 +72,7 @@ export default function ActaPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </section>
 
       <div className="mt-12 grid grid-cols-3 gap-8 text-center text-xs">

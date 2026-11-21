@@ -1,4 +1,5 @@
-import { NavLink, Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
+import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart3, CalendarDays, Layers, LogOut, Settings, Shield, Trophy, UserCircle, Users } from 'lucide-react'
 import clsx from 'clsx'
@@ -29,39 +30,46 @@ const TABS = [
 
 function Layout() {
   const { user, esAdmin, logout } = useAuth()
+  const navRef = useRef<HTMLElement>(null)
+  const { pathname } = useLocation()
+  // En móvil el menú se desliza: llevamos la pestaña activa a la vista.
+  useEffect(() => {
+    navRef.current?.querySelector('a[aria-current="page"]')?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [pathname])
   const { data: cfg } = useQuery({ queryKey: ['config'], queryFn: async () => (await api.get<Config>('/config')).data })
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-20 bg-slate-900 text-white shadow">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-2">
-          <h1 className="text-base font-bold sm:text-lg">⚽ {cfg?.nombre ?? 'Campeonato'}</h1>
-          <nav className="flex flex-wrap items-center gap-1">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-2 px-4 pt-2 lg:py-2">
+          <h1 className="order-1 min-w-0 flex-1 truncate text-base font-bold sm:text-lg">⚽ {cfg?.nombre ?? 'Campeonato'}</h1>
+          <div className="order-2 flex shrink-0 items-center lg:order-3">
+            <NavLink to="/cuenta" title="Mi cuenta" className={({ isActive }) => clsx('flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-sm', isActive ? 'bg-slate-700' : 'text-slate-300 hover:bg-slate-800')}>
+              <UserCircle size={18} /> <span className="hidden max-w-[10rem] truncate sm:inline">{user?.nombre}</span>
+            </NavLink>
+            <button onClick={logout} title="Cerrar sesión" className="flex min-h-10 min-w-10 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800">
+              <LogOut size={18} />
+            </button>
+          </div>
+          <nav ref={navRef} className="order-3 -mx-4 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto px-4 pb-2 pt-1 [scrollbar-width:none] lg:order-2 lg:mx-0 lg:w-auto lg:p-0 [&::-webkit-scrollbar]:hidden">
             {TABS.filter((t) => esAdmin || !t.admin).map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition',
+                    'flex min-h-10 flex-none items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition',
                     isActive ? 'bg-emerald-500 text-slate-900' : 'text-slate-300 hover:bg-slate-800',
                   )
                 }
               >
                 <Icon size={16} />
-                <span className="hidden lg:inline">{label}</span>
+                {label}
               </NavLink>
             ))}
-            <span className="mx-1 hidden h-6 w-px bg-slate-700 sm:block" />
-            <NavLink to="/cuenta" title="Mi cuenta" className={({ isActive }) => clsx('flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm', isActive ? 'bg-slate-700' : 'text-slate-300 hover:bg-slate-800')}>
-              <UserCircle size={16} /> <span className="hidden sm:inline">{user?.nombre}</span>
-            </NavLink>
-            <button onClick={logout} title="Cerrar sesión" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800">
-              <LogOut size={16} />
-            </button>
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl p-4">
+      <main className="mx-auto max-w-6xl p-3 sm:p-4">
         <Outlet />
       </main>
     </div>

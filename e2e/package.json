@@ -1,0 +1,7 @@
+{
+  "name": "campeonato-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Pruebas de navegador (Playwright + Edge instalado en el sistema)",
+  "dependencies": { "playwright-core": "^1.50.0" }
+}

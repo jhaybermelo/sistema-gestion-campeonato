@@ -28,25 +28,30 @@ function FilaJugador({ j, onChange }: { j: Jugador; onChange: () => void }) {
   if (edit)
     return (
       <tr className="bg-amber-50">
-        <td className="p-1"><input className="input w-16" type="number" value={numero} onChange={(e) => setNumero(e.target.value)} /></td>
-        <td className="p-1"><input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} /></td>
-        <td className="p-1"><input className="input w-24" type="number" placeholder="Año" value={anio} onChange={(e) => setAnio(e.target.value)} /></td>
-        <td className="p-1"><input className="input" value={documento} onChange={(e) => setDocumento(e.target.value)} /></td>
-        <td className="whitespace-nowrap p-1 text-right">
-          <button className="btn btn-pri !px-2 !py-1" onClick={() => guardar.mutate()}><Check size={16} /></button>{' '}
-          <button className="btn btn-sec !px-2 !py-1" onClick={() => setEdit(false)}><X size={16} /></button>
+        <td colSpan={5} className="p-2">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="w-16"><label className="lbl">N°</label><input className="input" type="number" value={numero} onChange={(e) => setNumero(e.target.value)} /></div>
+            <div className="min-w-[160px] flex-1"><label className="lbl">Nombre</label><input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} /></div>
+            <div className="w-24"><label className="lbl">Año nac.</label><input className="input" type="number" placeholder="Año" value={anio} onChange={(e) => setAnio(e.target.value)} /></div>
+            <div className="min-w-[120px] flex-1"><label className="lbl">Documento</label><input className="input" value={documento} onChange={(e) => setDocumento(e.target.value)} /></div>
+            <button className="btn btn-pri btn-icon" title="Guardar" onClick={() => guardar.mutate()}><Check size={16} /></button>
+            <button className="btn btn-sec btn-icon" title="Cancelar" onClick={() => setEdit(false)}><X size={16} /></button>
+          </div>
         </td>
       </tr>
     )
   return (
     <tr className="border-t border-slate-100">
       <td className="p-2 text-center font-bold text-emerald-700">{j.numero}</td>
-      <td className="p-2">{j.nombre}</td>
-      <td className="p-2 text-slate-500">{j.anio_nacimiento ?? '—'}</td>
-      <td className="p-2 text-slate-500">{j.documento}</td>
+      <td className="p-2">
+        {j.nombre}
+        <div className="text-xs text-slate-500 sm:hidden">{j.anio_nacimiento ?? '—'}{j.documento && ` · ${j.documento}`}</div>
+      </td>
+      <td className="hidden p-2 text-slate-500 sm:table-cell">{j.anio_nacimiento ?? '—'}</td>
+      <td className="hidden p-2 text-slate-500 sm:table-cell">{j.documento}</td>
       <td className="whitespace-nowrap p-2 text-right">
-        <button className="btn btn-sec !px-2 !py-1" onClick={() => setEdit(true)}><Pencil size={14} /></button>{' '}
-        <button className="btn btn-sec !px-2 !py-1" onClick={() => confirm(`¿Quitar a ${j.nombre}?`) && borrar.mutate()}><Trash2 size={14} /></button>
+        <button className="btn btn-sec btn-icon" title="Editar" onClick={() => setEdit(true)}><Pencil size={14} /></button>{' '}
+        <button className="btn btn-sec btn-icon" title="Quitar" onClick={() => confirm(`¿Quitar a ${j.nombre}?`) && borrar.mutate()}><Trash2 size={14} /></button>
       </td>
     </tr>
   )
@@ -154,7 +159,7 @@ function Detalle({ id, onDeleted }: { id: number; onDeleted: () => void }) {
 
       <table className="w-full text-sm">
         <thead className="text-left text-xs text-slate-500">
-          <tr><th className="w-16 p-2 text-center">N°</th><th className="p-2">Jugador</th><th className="p-2">Año nac.</th><th className="p-2">Documento</th><th /></tr>
+          <tr><th className="w-16 p-2 text-center">N°</th><th className="p-2">Jugador</th><th className="hidden p-2 sm:table-cell">Año nac.</th><th className="hidden p-2 sm:table-cell">Documento</th><th /></tr>
         </thead>
         <tbody>
           {jugadores.map((j) => <FilaJugador key={j.id} j={j} onChange={refrescar} />)}
@@ -183,7 +188,7 @@ export default function EquiposPage() {
   })
 
   return (
-    <div className="grid gap-4 md:grid-cols-[320px_1fr]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-[320px_minmax(0,1fr)]">
       <div className="space-y-3">
         <form className="card space-y-2" onSubmit={(e) => { e.preventDefault(); if (nombre) crear.mutate() }}>
           <h2 className="font-bold">Nuevo equipo</h2>
@@ -195,7 +200,7 @@ export default function EquiposPage() {
               <option value="">{categorias.length ? 'Seleccionar categoría…' : 'Sin categorías creadas'}</option>
               {categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.limita_anio ? ` (desde ${c.anio_minimo})` : ''}</option>)}
             </select>
-            <Link to="/categorias" className="mt-1 inline-block text-xs font-medium text-emerald-700 underline">+ Crear o editar categorías</Link>
+            <Link to="/categorias" className="mt-1 inline-block py-2 text-sm font-medium text-emerald-700 underline">+ Crear o editar categorías</Link>
           </div>
           <button className="btn btn-pri w-full" disabled={!nombre || (categorias.length > 0 && !categoriaId) || crear.isPending}><Plus size={16} /> Registrar equipo</button>
         </form>
