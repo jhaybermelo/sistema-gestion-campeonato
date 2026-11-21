@@ -1,0 +1,31 @@
+# Opción PostgreSQL + Docker (igual que SistemaEscuelaFutbol). No es necesario para usar iniciar.bat.
+# Uso: docker compose up -d --build   ->  http://localhost:8000
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: campeonato
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campeonato}
+      POSTGRES_DB: campeonato
+      TZ: America/Bogota
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campeonato"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://campeonato:${POSTGRES_PASSWORD:-campeonato}@db:5432/campeonato
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

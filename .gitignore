@@ -1,0 +1,24 @@
+# Entornos y dependencias
+backend/venv/
+frontend/node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Compilados
+frontend/dist/
+
+# Datos y secretos: NUNCA al repositorio
+backend/data/
+*.db
+*.db-shm
+*.db-wal
+secret.key
+.env
+.env.*
+!.env.example
+
+# Registros y temporales
+*.log
+*.out
+.claude/

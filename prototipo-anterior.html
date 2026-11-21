@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema de Campeonato - Fútbol de Salón</title>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--card2:#273449;--tx:#e2e8f0;--mut:#94a3b8;--pri:#22c55e;--am:#facc15;--ro:#ef4444;--az:#3b82f6;--bd:#334155}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--tx)}
+header{background:#020617;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5}
+header h1{font-size:18px;margin:0}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav button{background:var(--card);color:var(--tx);border:0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:14px}
+nav button.act{background:var(--pri);color:#052e16;font-weight:700}
+main{padding:16px;max-width:1200px;margin:auto}
+.card{background:var(--card);border-radius:12px;padding:14px;margin-bottom:14px}
+h2,h3{margin:0 0 10px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+input,select{background:#0b1220;color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:8px;font-size:14px;max-width:100%}
+label{font-size:12px;color:var(--mut);display:block;margin-bottom:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px}
+button.b{background:var(--pri);color:#052e16;border:0;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;font-size:14px}
+button.b.sec{background:var(--card2);color:var(--tx)}
+button.b.del{background:var(--ro);color:#fff}
+button.b:disabled{opacity:.4;cursor:not-allowed}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--bd)}
+th{color:var(--mut);font-weight:600;font-size:12px}
+td.n,th.n{text-align:center}
+.mut{color:var(--mut)}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;background:var(--card2)}
+.tag.live{background:var(--pri);color:#052e16}
+.tag.fin{background:#475569}
+.marcador{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;text-align:center}
+.marcador .eq{font-size:22px;font-weight:700}
+.marcador .sc{font-size:56px;font-weight:800}
+.reloj{font-size:76px;font-weight:800;font-variant-numeric:tabular-nums;text-align:center;line-height:1}
+.reloj.fin{color:var(--ro)}
+.reloj.run{color:var(--pri)}
+.per{text-align:center;color:var(--mut);margin-bottom:8px}
+.ctrl{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+.ctrl .b{font-size:16px;padding:10px 20px}
+.faltas{text-align:center;font-size:13px;margin-top:4px}
+.faltas.alerta{color:var(--ro);font-weight:700}
+.jug{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--bd);flex-wrap:wrap}
+.jug .num{width:28px;text-align:center;font-weight:800;color:var(--pri)}
+.jug .nom{flex:1;min-width:110px}
+.jug.exp .nom{text-decoration:line-through;color:var(--mut)}
+.jug button{border:0;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:13px;font-weight:700}
+.bg{background:#f8fafc;color:#0f172a}.ba{background:var(--am);color:#422006}.br{background:var(--ro);color:#fff}.bz{background:var(--az);color:#fff}.bf{background:#64748b;color:#fff}
+.chip{font-size:12px;padding:1px 6px;border-radius:5px;margin-left:2px}
+.chip.a{background:var(--am);color:#422006}.chip.r{background:var(--ro);color:#fff}.chip.z{background:var(--az);color:#fff}.chip.g{background:#f8fafc;color:#0f172a}
+.ev{display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--bd);font-size:14px}
+.ev .t{width:70px;color:var(--mut);font-variant-numeric:tabular-nums}
+.ev .x{margin-left:auto;cursor:pointer;color:var(--ro);background:none;border:0}
+.item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd);flex-wrap:wrap}
+.item .grow{flex:1;min-width:160px}
+.item.click{cursor:pointer}
+#acta{display:none}
+@media print{
+  body.print-acta header,body.print-acta main{display:none}
+  body.print-acta #acta{display:block;background:#fff;color:#000;padding:10px;font-size:12px}
+  body.print-acta #acta table{width:100%} body.print-acta #acta th,body.print-acta #acta td{border:1px solid #000;color:#000;padding:3px 5px}
+  body.print-acta{background:#fff}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="titulo"></h1>
+  <nav id="nav"></nav>
+</header>
+<main id="app"></main>
+<div id="acta"></div>
+
+<script>
+/* ================= DATOS ================= */
+const KEY = 'campeonato_futsal_v1';
+const DEF = {config:{nombre:'Campeonato de Fútbol de Salón',duracion:20,tiempos:2,limiteFaltas:5,pG:3,pE:1,pP:0},equipos:[],partidos:[]};
+let S = load();
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&d.config)return d}catch(e){}return JSON.parse(JSON.stringify(DEF))}
+function save(){localStorage.setItem(KEY,JSON.stringify(S))}
+const uid = () => Math.random().toString(36).slice(2,9);
+const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = id => document.getElementById(id);
+const val = id => ($(id)?.value ?? '').trim();
+
+let view = 'partidos', selEquipo = null, selPartido = null;
+
+const eqp = id => S.equipos.find(e=>e.id===id);
+const jug = (eid,jid) => eqp(eid)?.jugadores.find(j=>j.id===jid);
+const mp = id => S.partidos.find(p=>p.id===id);
+const teamId = (m,lado) => lado==='local'?m.local:m.visitante;
+const nomEq = id => eqp(id)?.nombre ?? '(eliminado)';
+
+/* ================= CÁLCULOS ================= */
+function goles(m,lado){
+  const otro = lado==='local'?'visitante':'local';
+  return m.eventos.filter(e=>e.tipo==='gol'&&e.equipo===lado).length
+       + m.eventos.filter(e=>e.tipo==='autogol'&&e.equipo===otro).length;
+}
+const faltasPer = (m,lado,per) => m.eventos.filter(e=>e.tipo==='falta'&&e.equipo===lado&&e.periodo===per).length;
+const cuenta = (m,lado,jid,tipo) => m.eventos.filter(e=>e.tipo===tipo&&e.equipo===lado&&e.jugador===jid).length;
+const expulsado = (m,lado,jid) => cuenta(m,lado,jid,'roja')>0 || cuenta(m,lado,jid,'amarilla')>=2;
+
+function fmt(sec){sec=Math.max(0,Math.ceil(sec));return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0')}
+function rest(m){return m.corriendo?Math.max(0,m.restanteInicio-(Date.now()-m.inicioTs)/1000):m.restante}
+
+function tabla(){
+  const t={};
+  S.equipos.forEach(e=>t[e.id]={id:e.id,nombre:e.nombre,pj:0,pg:0,pe:0,pp:0,gf:0,gc:0,pts:0});
+  S.partidos.filter(m=>m.estado==='finalizado'&&t[m.local]&&t[m.visitante]).forEach(m=>{
+    const a=goles(m,'local'),b=goles(m,'visitante'),L=t[m.local],V=t[m.visitante],c=S.config;
+    L.pj++;V.pj++;L.gf+=a;L.gc+=b;V.gf+=b;V.gc+=a;
+    if(a>b){L.pg++;V.pp++;L.pts+=+c.pG;V.pts+=+c.pP}
+    else if(a<b){V.pg++;L.pp++;V.pts+=+c.pG;L.pts+=+c.pP}
+    else{L.pe++;V.pe++;L.pts+=+c.pE;V.pts+=+c.pE}
+  });
+  return Object.values(t).sort((x,y)=>y.pts-x.pts||(y.gf-y.gc)-(x.gf-x.gc)||y.gf-x.gf||x.nombre.localeCompare(y.nombre));
+}
+
+function estadisticasJugadores(){
+  const r={};
+  S.partidos.forEach(m=>m.eventos.forEach(e=>{
+    if(!e.jugador||!['gol','amarilla','roja','azul'].includes(e.tipo))return;
+    const k=e.equipo==='local'?m.local+'|'+e.jugador:m.visitante+'|'+e.jugador;
+    const [eid,jid]=k.split('|');
+    const j=jug(eid,jid); if(!j)return;
+    r[k]??={equipo:nomEq(eid),nombre:j.nombre,numero:j.numero,gol:0,amarilla:0,roja:0,azul:0};
+    r[k][e.tipo]++;
+  }));
+  return Object.values(r);
+}
+
+/* ================= NAVEGACIÓN ================= */
+const TABS=[['partidos','Partidos'],['equipos','Equipos'],['tabla','Tabla'],['stats','Goleadores y tarjetas'],['config','Configuración']];
+function go(v){view=v;render()}
+function render(){
+  $('titulo').textContent='⚽ '+S.config.nombre;
+  $('nav').innerHTML=TABS.map(([k,n])=>`<button class="${(view===k||(view==='partido'&&k==='partidos'))?'act':''}" onclick="go('${k}')">${n}</button>`).join('');
+  const f={equipos:vEquipos,partidos:vPartidos,partido:vPartido,tabla:vTabla,stats:vStats,config:vConfig}[view];
+  $('app').innerHTML=f();
+}
+
+/* ================= EQUIPOS ================= */
+function vEquipos(){
+  const e=eqp(selEquipo);
+  return `<div class="grid g2">
+  <div class="card"><h2>Equipos (${S.equipos.length})</h2>
+    <div class="row"><div><label>Nombre del equipo</label><input id="eqN"></div>
+    <div><label>Delegado</label><input id="eqD"></div>
+    <button class="b" onclick="addEquipo()">Agregar</button></div>
+    ${S.equipos.map(q=>`<div class="item click" onclick="selEquipo='${q.id}';render()">
+      <div class="grow"><b>${esc(q.nombre)}</b><div class="mut" style="font-size:12px">${esc(q.delegado||'')} · ${q.jugadores.length} jugadores</div></div>
+      <button class="b del" onclick="event.stopPropagation();delEquipo('${q.id}')">Eliminar</button></div>`).join('')||'<p class="mut">Aún no hay equipos.</p>'}
+  </div>
+  <div class="card">${e?`<h2>Jugadores de ${esc(e.nombre)}</h2>
+    <div class="row"><div><label>N°</label><input id="jNum" type="number" min="0" style="width:70px"></div>
+    <div><label>Nombre</label><input id="jNom"></div>
+    <div><label>Documento</label><input id="jDoc" style="width:120px"></div>
+    <button class="b" onclick="addJugador()">Agregar</button></div>
+    <table><tr><th class="n">N°</th><th>Nombre</th><th>Documento</th><th></th></tr>
+    ${e.jugadores.slice().sort((a,b)=>a.numero-b.numero).map(j=>`<tr><td class="n">${esc(j.numero)}</td><td>${esc(j.nombre)}</td><td>${esc(j.doc)}</td>
+    <td><button class="b del" onclick="delJugador('${j.id}')">✕</button></td></tr>`).join('')}</table>
+    `:'<p class="mut">Selecciona un equipo para ver y registrar sus jugadores.</p>'}</div></div>`;
+}
+function addEquipo(){
+  const n=val('eqN'); if(!n)return alert('Escribe el nombre del equipo');
+  if(S.equipos.some(e=>e.nombre.toLowerCase()===n.toLowerCase()))return alert('Ya existe un equipo con ese nombre');
+  const e={id:uid(),nombre:n,delegado:val('eqD'),jugadores:[]};S.equipos.push(e);selEquipo=e.id;save();render();
+}
+function delEquipo(id){
+  if(S.partidos.some(m=>m.local===id||m.visitante===id))return alert('No se puede eliminar: el equipo tiene partidos registrados.');
+  if(!confirm('¿Eliminar el equipo?'))return;
+  S.equipos=S.equipos.filter(e=>e.id!==id);if(selEquipo===id)selEquipo=null;save();render();
+}
+function addJugador(){
+  const e=eqp(selEquipo);const n=val('jNom'),num=val('jNum');
+  if(!n||num==='')return alert('Escribe número y nombre');
+  if(e.jugadores.some(j=>String(j.numero)===num))return alert('Ese número ya está en uso en este equipo');
+  e.jugadores.push({id:uid(),nombre:n,numero:+num,doc:val('jDoc')});save();render();
+}
+function delJugador(id){
+  if(S.partidos.some(m=>m.eventos.some(ev=>ev.jugador===id))&&!confirm('El jugador tiene eventos registrados. ¿Eliminar de todas formas?'))return;
+  const e=eqp(selEquipo);e.jugadores=e.jugadores.filter(j=>j.id!==id);save();render();
+}
+
+/* ================= PARTIDOS ================= */
+function vPartidos(){
+  const opts=S.equipos.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join('');
+  const lista=S.partidos.slice().sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  return `<div class="card"><h2>Nuevo partido</h2>
+  ${S.equipos.length<2?'<p class="mut">Registra al menos 2 equipos primero.</p>':`
+  <div class="row"><div><label>Local</label><select id="pL">${opts}</select></div>
+  <div><label>Visitante</label><select id="pV">${opts}</select></div>
+  <div><label>Fecha</label><input id="pF" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+  <div><label>Hora</label><input id="pH" type="time"></div>
+  <div><label>Cancha</label><input id="pC" style="width:120px"></div>
+  <div><label>Jornada / fase</label><input id="pJ" style="width:120px"></div>
+  <button class="b" onclick="addPartido()">Crear</button></div>`}</div>
+  <div class="card"><h2>Partidos (${lista.length})</h2>
+  ${lista.map(m=>`<div class="item">
+    <div class="grow"><b>${esc(nomEq(m.local))}</b> <b>${goles(m,'local')} - ${goles(m,'visitante')}</b> <b>${esc(nomEq(m.visitante))}</b>
+    <div class="mut" style="font-size:12px">${esc(m.fecha)} ${esc(m.hora)} · ${esc(m.cancha||'')} ${m.jornada?'· '+esc(m.jornada):''}</div></div>
+    <span class="tag ${m.estado==='en_juego'?'live':m.estado==='finalizado'?'fin':''}">${{programado:'Programado',en_juego:'En juego',finalizado:'Finalizado'}[m.estado]}</span>
+    <button class="b" onclick="selPartido='${m.id}';go('partido')">${m.estado==='finalizado'?'Ver':'Abrir'}</button>
+    <button class="b del" onclick="delPartido('${m.id}')">✕</button></div>`).join('')||'<p class="mut">Aún no hay partidos.</p>'}</div>`;
+}
+function addPartido(){
+  const L=val('pL'),V=val('pV');if(L===V)return alert('Local y visitante deben ser distintos');
+  S.partidos.push({id:uid(),local:L,visitante:V,fecha:val('pF'),hora:val('pH'),cancha:val('pC'),jornada:val('pJ'),
+    estado:'programado',periodo:1,restante:S.config.duracion*60,corriendo:false,inicioTs:0,restanteInicio:0,
+    planilla:{local:eqp(L).jugadores.map(j=>j.id),visitante:eqp(V).jugadores.map(j=>j.id)},eventos:[]});
+  save();render();
+}
+function delPartido(id){if(confirm('¿Eliminar el partido y todos sus eventos?')){S.partidos=S.partidos.filter(m=>m.id!==id);save();render()}}
+
+/* ================= PARTIDO EN VIVO ================= */
+function vPartido(){
+  const m=mp(selPartido);if(!m){view='partidos';return vPartidos()}
+  const fin=m.estado==='finalizado',r=rest(m);
+  const ctrl=fin?`<button class="b sec" onclick="reabrir()">Reabrir partido</button><button class="b" onclick="imprimirActa()">🖨 Imprimir acta</button>`:`
+    ${m.corriendo?`<button class="b del" onclick="pausar()">⏸ Parar</button>`:`<button class="b" onclick="iniciar()" ${r<=0?'disabled':''}>▶ ${m.estado==='programado'?'Iniciar':'Reanudar'}</button>`}
+    <button class="b sec" onclick="siguienteTiempo()" ${m.corriendo||m.periodo>=S.config.tiempos?'disabled':''}>Siguiente tiempo ⏭</button>
+    <button class="b sec" onclick="ajustarTiempo()" ${m.corriendo?'disabled':''}>⏱ Ajustar</button>
+    <button class="b sec" onclick="finalizar()">🏁 Finalizar partido</button>
+    <button class="b sec" onclick="imprimirActa()">🖨 Acta</button>`;
+  return `<button class="b sec" onclick="go('partidos')">← Volver</button>
+  <div class="card" style="margin-top:12px">
+    <div class="marcador"><div class="eq">${esc(nomEq(m.local))}</div><div class="sc">${goles(m,'local')} - ${goles(m,'visitante')}</div><div class="eq">${esc(nomEq(m.visitante))}</div></div>
+    <div class="per">${m.estado==='programado'?'Sin iniciar':fin?'Finalizado':m.periodo+'º tiempo de '+S.config.tiempos} · ${esc(m.fecha)} ${esc(m.hora)} ${esc(m.cancha||'')}</div>
+    <div id="reloj" class="reloj ${m.corriendo?'run':r<=0?'fin':''}">${fmt(r)}</div>
+    <div class="ctrl">${ctrl}</div>
+    <div class="grid g2" style="margin-top:14px">${['local','visitante'].map(l=>{
+      const f=faltasPer(m,l,m.periodo),al=f>=S.config.limiteFaltas;
+      return `<div class="faltas ${al?'alerta':''}">Faltas ${esc(nomEq(teamId(m,l)))} (${m.periodo}º T): ${f}/${S.config.limiteFaltas}${al?' ⚠ límite alcanzado':''}
+      · Total: ${m.eventos.filter(e=>e.tipo==='falta'&&e.equipo===l).length}</div>`}).join('')}</div>
+  </div>
+  <div class="grid g2">${['local','visitante'].map(l=>planillaEquipo(m,l,fin)).join('')}</div>
+  <div class="card"><h3>Eventos del partido</h3>${eventosHTML(m,fin)}</div>`;
+}
+function planillaEquipo(m,lado,fin){
+  const e=eqp(teamId(m,lado));if(!e)return '';
+  const pl=m.planilla[lado];
+  const lista=e.jugadores.slice().sort((a,b)=>a.numero-b.numero);
+  const conv=lista.filter(j=>pl.includes(j.id));
+  return `<div class="card"><h3>Planilla: ${esc(e.nombre)}</h3>
+  ${fin?'':`<details style="margin-bottom:8px"><summary class="mut" style="cursor:pointer">Convocar jugadores (${conv.length}/${lista.length})</summary>
+    ${lista.map(j=>`<label style="display:block;color:var(--tx);font-size:14px"><input type="checkbox" ${pl.includes(j.id)?'checked':''} onchange="toggleConv('${lado}','${j.id}')"> ${esc(j.numero)} · ${esc(j.nombre)}</label>`).join('')||'<span class="mut">El equipo no tiene jugadores.</span>'}</details>`}
+  ${conv.map(j=>{
+    const g=cuenta(m,lado,j.id,'gol')+0,a=cuenta(m,lado,j.id,'amarilla'),ro=cuenta(m,lado,j.id,'roja'),az=cuenta(m,lado,j.id,'azul'),fa=cuenta(m,lado,j.id,'falta');
+    return `<div class="jug ${expulsado(m,lado,j.id)?'exp':''}"><span class="num">${esc(j.numero)}</span>
+    <span class="nom">${esc(j.nombre)}${g?` <span class="chip g">⚽${g}</span>`:''}${a?` <span class="chip a">${a}</span>`:''}${az?` <span class="chip z">${az}</span>`:''}${ro?` <span class="chip r">${ro}</span>`:''}${fa?` <span class="mut" style="font-size:12px">F${fa}</span>`:''}</span>
+    ${fin?'':`<button class="bg" title="Gol" onclick="evento('${lado}','${j.id}','gol')">⚽</button>
+    <button class="ba" title="Amarilla" onclick="evento('${lado}','${j.id}','amarilla')">A</button>
+    <button class="bz" title="Azul" onclick="evento('${lado}','${j.id}','azul')">Az</button>
+    <button class="br" title="Roja" onclick="evento('${lado}','${j.id}','roja')">R</button>
+    <button class="bf" title="Falta" onclick="evento('${lado}','${j.id}','falta')">F</button>
+    <button class="bf" title="Autogol" onclick="evento('${lado}','${j.id}','autogol')">AG</button>`}</div>`}).join('')||'<p class="mut">Sin jugadores convocados.</p>'}
+  ${fin?'':`<div class="row" style="margin-top:10px"><button class="b sec" onclick="evento('${lado}',null,'falta')">+ Falta del equipo</button><button class="b sec" onclick="evento('${lado}',null,'gol')">+ Gol (sin jugador)</button></div>`}
+  </div>`;
+}
+const ICON={gol:'⚽ Gol',autogol:'⚽ Autogol',amarilla:'🟨 Amarilla',roja:'🟥 Roja',azul:'🟦 Azul',falta:'🚫 Falta'};
+function eventosHTML(m,fin){
+  if(!m.eventos.length)return '<p class="mut">Sin eventos.</p>';
+  return m.eventos.slice().reverse().map(ev=>{
+    const j=jug(teamId(m,ev.equipo),ev.jugador);
+    return `<div class="ev"><span class="t">${ev.periodo}T ${esc(ev.tiempo)}</span><span>${ICON[ev.tipo]}</span>
+    <span>${j?`#${esc(j.numero)} ${esc(j.nombre)}`:'(equipo)'} — ${esc(nomEq(teamId(m,ev.equipo)))}</span>
+    ${fin?'':`<button class="x" onclick="delEvento('${ev.id}')">✕</button>`}</div>`}).join('');
+}
+function toggleConv(lado,jid){const m=mp(selPartido),a=m.planilla[lado],i=a.indexOf(jid);i<0?a.push(jid):a.splice(i,1);save();render()}
+
+/* --- cronómetro --- */
+function iniciar(){
+  const m=mp(selPartido);if(m.corriendo||m.estado==='finalizado')return;
+  if(m.estado==='programado'){m.estado='en_juego';m.periodo=1;m.restante=S.config.duracion*60}
+  m.restanteInicio=m.restante;m.inicioTs=Date.now();m.corriendo=true;save();render();
+}
+function pausar(){const m=mp(selPartido);if(!m.corriendo)return;m.restante=rest(m);m.corriendo=false;save();render()}
+function siguienteTiempo(){
+  const m=mp(selPartido);if(m.corriendo||m.periodo>=S.config.tiempos)return;
+  if(m.estado==='programado')return alert('Inicia el partido primero');
+  if(rest(m)>0&&!confirm('Aún queda tiempo en este periodo. ¿Pasar al siguiente tiempo?'))return;
+  m.periodo++;m.restante=S.config.duracion*60;save();render();
+}
+function ajustarTiempo(){
+  const m=mp(selPartido);if(m.corriendo)return;
+  const s=prompt('Tiempo restante del periodo (mm:ss):',fmt(rest(m)));if(s===null)return;
+  const p=s.split(':').map(Number);if(p.some(isNaN)||p.length>2)return alert('Formato inválido');
+  m.restante=p.length===2?p[0]*60+p[1]:p[0]*60;save();render();
+}
+function finalizar(){
+  const m=mp(selPartido);if(!confirm('¿Finalizar el partido? Se contará en la tabla de posiciones.'))return;
+  if(m.corriendo){m.restante=rest(m);m.corriendo=false}m.estado='finalizado';save();render();
+}
+function reabrir(){const m=mp(selPartido);m.estado='en_juego';save();render()}
+
+setInterval(()=>{
+  if(view!=='partido')return;const m=mp(selPartido);if(!m||!m.corriendo)return;
+  const r=rest(m);
+  if(r<=0){m.restante=0;m.corriendo=false;save();beep();render();return}
+  const el=$('reloj');if(el)el.textContent=fmt(r);
+},200);
+function beep(){try{const c=new AudioContext(),o=c.createOscillator();o.connect(c.destination);o.frequency.value=880;o.start();setTimeout(()=>{o.stop();c.close()},1200)}catch(e){}}
+
+/* --- eventos --- */
+function evento(lado,jid,tipo){
+  const m=mp(selPartido);
+  if(m.estado==='programado')return alert('Inicia el partido con el cronómetro antes de registrar eventos.');
+  if(jid&&expulsado(m,lado,jid)&&tipo!=='autogol'&&!confirm('Este jugador ya está expulsado. ¿Registrar de todas formas?'))return;
+  const trans=S.config.duracion*60-rest(m);
+  m.eventos.push({id:uid(),tipo,equipo:lado,jugador:jid,periodo:m.periodo,tiempo:fmt(Math.max(0,Math.floor(trans)))});
+  if(jid&&tipo==='amarilla'&&cuenta(m,lado,jid,'amarilla')===2)alert('⚠ Segunda amarilla: el jugador queda expulsado.');
+  if(tipo==='falta'&&faltasPer(m,lado,m.periodo)===+S.config.limiteFaltas)alert('⚠ '+nomEq(teamId(m,lado))+' alcanzó el límite de faltas del tiempo.');
+  save();render();
+}
+function delEvento(id){const m=mp(selPartido);m.eventos=m.eventos.filter(e=>e.id!==id);save();render()}
+
+/* --- acta --- */
+function imprimirActa(){
+  const m=mp(selPartido);
+  const eqT=lado=>{const e=eqp(teamId(m,lado));if(!e)return '';
+    return `<h3>${esc(e.nombre)} (${lado}) — Delegado: ${esc(e.delegado||'')}</h3><table><tr><th>N°</th><th>Jugador</th><th>Doc.</th><th>Goles</th><th>Amar.</th><th>Azul</th><th>Roja</th><th>Faltas</th><th>Firma</th></tr>
+    ${e.jugadores.filter(j=>m.planilla[lado].includes(j.id)).sort((a,b)=>a.numero-b.numero).map(j=>`<tr><td>${esc(j.numero)}</td><td>${esc(j.nombre)}</td><td>${esc(j.doc)}</td><td>${cuenta(m,lado,j.id,'gol')||''}</td><td>${cuenta(m,lado,j.id,'amarilla')||''}</td><td>${cuenta(m,lado,j.id,'azul')||''}</td><td>${cuenta(m,lado,j.id,'roja')||''}</td><td>${cuenta(m,lado,j.id,'falta')||''}</td><td></td></tr>`).join('')}</table>
+    <p>Faltas: ${Array.from({length:S.config.tiempos},(_,i)=>`${i+1}T: ${faltasPer(m,lado,i+1)}`).join(' · ')}</p>`};
+  $('acta').innerHTML=`<h2 style="text-align:center">${esc(S.config.nombre)} — ACTA DE JUEGO</h2>
+  <p><b>Fecha:</b> ${esc(m.fecha)} <b>Hora:</b> ${esc(m.hora)} <b>Cancha:</b> ${esc(m.cancha||'')} <b>Jornada:</b> ${esc(m.jornada||'')}</p>
+  <h2 style="text-align:center">${esc(nomEq(m.local))} ${goles(m,'local')} - ${goles(m,'visitante')} ${esc(nomEq(m.visitante))}</h2>
+  ${eqT('local')}${eqT('visitante')}
+  <h3>Eventos</h3><table><tr><th>Tiempo</th><th>Evento</th><th>Jugador</th><th>Equipo</th></tr>
+  ${m.eventos.map(ev=>{const j=jug(teamId(m,ev.equipo),ev.jugador);return `<tr><td>${ev.periodo}T ${esc(ev.tiempo)}</td><td>${ICON[ev.tipo]}</td><td>${j?'#'+esc(j.numero)+' '+esc(j.nombre):''}</td><td>${esc(nomEq(teamId(m,ev.equipo)))}</td></tr>`}).join('')}</table>
+  <br><br><p>Árbitro: ______________________ &nbsp;&nbsp; Vocal/Planillero: ______________________ &nbsp;&nbsp; Observaciones: ______________________</p>`;
+  document.body.classList.add('print-acta');
+  window.onafterprint=()=>document.body.classList.remove('print-acta');
+  window.print();
+}
+
+/* ================= TABLA / STATS / CONFIG ================= */
+function vTabla(){
+  const t=tabla();
+  return `<div class="card"><h2>Tabla de posiciones</h2><table><tr><th class="n">#</th><th>Equipo</th><th class="n">PJ</th><th class="n">PG</th><th class="n">PE</th><th class="n">PP</th><th class="n">GF</th><th class="n">GC</th><th class="n">DG</th><th class="n">Pts</th></tr>
+  ${t.map((x,i)=>`<tr><td class="n">${i+1}</td><td><b>${esc(x.nombre)}</b></td><td class="n">${x.pj}</td><td class="n">${x.pg}</td><td class="n">${x.pe}</td><td class="n">${x.pp}</td><td class="n">${x.gf}</td><td class="n">${x.gc}</td><td class="n">${x.gf-x.gc}</td><td class="n"><b>${x.pts}</b></td></tr>`).join('')}</table>
+  <p class="mut" style="font-size:12px">Solo cuentan los partidos finalizados.</p></div>`;
+}
+function vStats(){
+  const st=estadisticasJugadores();
+  const gl=st.filter(s=>s.gol).sort((a,b)=>b.gol-a.gol);
+  const tj=st.filter(s=>s.amarilla||s.roja||s.azul).sort((a,b)=>b.roja-a.roja||b.amarilla-a.amarilla||b.azul-a.azul);
+  return `<div class="grid g2"><div class="card"><h2>Goleadores</h2><table><tr><th>#</th><th>Jugador</th><th>Equipo</th><th class="n">Goles</th></tr>
+  ${gl.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.numero)} · ${esc(s.nombre)}</td><td>${esc(s.equipo)}</td><td class="n"><b>${s.gol}</b></td></tr>`).join('')||'<tr><td colspan="4" class="mut">Sin goles.</td></tr>'}</table></div>
+  <div class="card"><h2>Tarjetas</h2><table><tr><th>Jugador</th><th>Equipo</th><th class="n">🟨</th><th class="n">🟦</th><th class="n">🟥</th></tr>
+  ${tj.map(s=>`<tr><td>${esc(s.numero)} · ${esc(s.nombre)}</td><td>${esc(s.equipo)}</td><td class="n">${s.amarilla}</td><td class="n">${s.azul}</td><td class="n">${s.roja}</td></tr>`).join('')||'<tr><td colspan="5" class="mut">Sin tarjetas.</td></tr>'}</table></div></div>`;
+}
+function vConfig(){
+  const c=S.config;
+  return `<div class="card"><h2>Configuración</h2>
+  <div class="row"><div><label>Nombre del campeonato</label><input id="cN" value="${esc(c.nombre)}" style="width:300px"></div></div>
+  <div class="row"><div><label>Minutos por tiempo</label><input id="cD" type="number" min="1" value="${c.duracion}" style="width:90px"></div>
+  <div><label>N° de tiempos</label><input id="cT" type="number" min="1" max="4" value="${c.tiempos}" style="width:90px"></div>
+  <div><label>Límite de faltas por tiempo</label><input id="cF" type="number" min="1" value="${c.limiteFaltas}" style="width:90px"></div></div>
+  <div class="row"><div><label>Pts. ganado</label><input id="cG" type="number" value="${c.pG}" style="width:80px"></div>
+  <div><label>Pts. empate</label><input id="cE" type="number" value="${c.pE}" style="width:80px"></div>
+  <div><label>Pts. perdido</label><input id="cP" type="number" value="${c.pP}" style="width:80px"></div></div>
+  <button class="b" onclick="saveConfig()">Guardar</button>
+  <p class="mut" style="font-size:12px">La duración se aplica a los partidos que aún no han iniciado.</p></div>
+  <div class="card"><h2>Respaldo de datos</h2><div class="row">
+  <button class="b sec" onclick="exportar()">⬇ Exportar respaldo</button>
+  <label class="b sec" style="margin:0;color:var(--tx);cursor:pointer">⬆ Importar respaldo<input type="file" accept=".json" hidden onchange="importar(this)"></label>
+  <button class="b del" onclick="borrarTodo()">Borrar todo</button></div>
+  <p class="mut" style="font-size:12px">Los datos se guardan en este navegador. Exporta un respaldo con frecuencia.</p></div>`;
+}
+function saveConfig(){
+  const c=S.config;c.nombre=val('cN')||c.nombre;c.duracion=+val('cD')||20;c.tiempos=+val('cT')||2;c.limiteFaltas=+val('cF')||5;c.pG=+val('cG');c.pE=+val('cE');c.pP=+val('cP');
+  S.partidos.filter(m=>m.estado==='programado').forEach(m=>m.restante=c.duracion*60);save();render();alert('Configuración guardada');
+}
+function exportar(){
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));
+  a.download='campeonato-respaldo-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+}
+function importar(inp){
+  const f=inp.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.config||!d.equipos||!d.partidos)throw 0;if(confirm('Esto reemplaza todos los datos actuales. ¿Continuar?')){S=d;save();render()}}catch(e){alert('Archivo inválido')}};
+  r.readAsText(f);
+}
+function borrarTodo(){if(confirm('¿Borrar TODOS los datos?')&&confirm('Esta acción no se puede deshacer. ¿Seguro?')){S=JSON.parse(JSON.stringify(DEF));save();selEquipo=selPartido=null;view='partidos';render()}}
+
+render();
+</script>
+</body>
+</html>
