@@ -20,9 +20,16 @@ class ConfigIn(In):
     pts_empate: int = Field(ge=0, le=10)
     pts_perdido: int = Field(ge=0, le=10)
     max_jugadores: int = Field(12, ge=5, le=30)
+    min_jugadores: int = Field(0, ge=0, le=30)
     fase_goleador: Fase = "grupos"
     fase_valla: Fase = "semifinal"
     descanso_min: int = Field(10, ge=1, le=30)
+
+    @model_validator(mode="after")
+    def _minimo_no_supera_maximo(self):
+        if self.min_jugadores > self.max_jugadores:
+            raise ValueError("El mínimo de jugadores no puede ser mayor que el máximo de la planilla")
+        return self
 
 
 class CategoriaIn(In):

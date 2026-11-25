@@ -174,4 +174,25 @@ with TestClient(app) as c:
     pid7 = nuevo_partido()
     ok(c.post(f"/api/partidos/{pid7}/eventos", headers=D, json={"tipo": "tiempo_muerto", "equipo_id": A["id"]}).status_code == 403, "un delegado no puede pedir tiempos muertos")
     ok(c.post(f"/api/partidos/{pid7}/descanso", headers=D).status_code == 403, "ni manejar el descanso")
+    # ================= MÍNIMO DE JUGADORES (configurable por el administrador) =================
+    Cc = A_("POST", "/equipos", json={"nombre": "C"}).json()
+    for n in (1, 2):
+        A_("POST", f"/equipos/{Cc['id']}/jugadores", json={"numero": n, "nombre": f"C{n}"})
+    crear = lambda: A_("POST", "/partidos", json={"local_id": A["id"], "visitante_id": Cc["id"], "fecha": "2026-12-03"}).json()["id"]
+    ma, mb = crear(), crear()
+    cfg = A_("GET", "/config").json(); cfg.pop("fases")
+    ok(cfg["min_jugadores"] == 0 and cfg["max_jugadores"] == 12, "por defecto: máximo 12 y SIN mínimo (0): no bloquea nada")
+    cfg["min_jugadores"] = 3
+    ok(A_("PUT", "/config", json=cfg).status_code == 200, "el administrador define un mínimo de 3")
+    r = A_("POST", f"/partidos/{ma}/iniciar")
+    ok(r.status_code == 400 and "C tiene 2 jugadores convocados y el mínimo para jugar es 3" in r.json()["detail"], f"no se inicia con menos del mínimo: {r.json()['detail'][:70]}…")
+    A_("POST", f"/equipos/{Cc['id']}/jugadores", json={"numero": 3, "nombre": "C3"})
+    ok(A_("POST", f"/partidos/{ma}/iniciar").status_code == 200, "al inscribir al tercero, el partido sí inicia")
+    cfg["min_jugadores"] = 0
+    A_("PUT", "/config", json=cfg)
+    ok(A_("POST", f"/partidos/{mb}/iniciar").status_code == 200, "con el mínimo en 0 no se exige nada")
+    cfg["min_jugadores"] = 20
+    ok(A_("PUT", "/config", json=cfg).status_code == 422, "el mínimo no puede superar el máximo de la planilla")
+    cfg["min_jugadores"] = 0; cfg["max_jugadores"] = 12; A_("PUT", "/config", json=cfg)
+
     print("\nTODO OK")

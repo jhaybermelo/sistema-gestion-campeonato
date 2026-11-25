@@ -52,7 +52,8 @@ export default function ConfigPage() {
           {num('pts_perdido', 'Puntos por perder')}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          {num('max_jugadores', 'Jugadores por planilla')}
+          {num('max_jugadores', 'Máximo de jugadores por planilla')}
+          {num('min_jugadores', 'Mínimo de jugadores para jugar', '0 = sin mínimo. La AMF indica 7 inscritos.')}
           {num('descanso_min', 'Descanso entre tiempos (min)')}
           <div>
             <label className="lbl">Goleador cuenta desde</label>

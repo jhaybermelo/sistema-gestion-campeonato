@@ -10,6 +10,7 @@ export interface Config {
   pts_empate: number
   pts_perdido: number
   max_jugadores: number
+  min_jugadores: number
   descanso_min: number
   fase_goleador: string
   fase_valla: string
@@ -47,6 +48,7 @@ export interface Equipo {
   es_propio?: boolean
   planilla_cerrada?: boolean
   max_jugadores?: number
+  min_jugadores?: number
   puede_editar_plantel?: boolean
   jugadores?: Jugador[]
 }

@@ -43,6 +43,7 @@ class Config(Base):
     pts_empate: Mapped[int] = mapped_column(Integer, default=1)
     pts_perdido: Mapped[int] = mapped_column(Integer, default=0)
     max_jugadores: Mapped[int] = mapped_column(Integer, default=12)  # tamaño de la planilla de cada equipo
+    min_jugadores: Mapped[int] = mapped_column(Integer, default=0)  # mínimo para poder jugar (0 = sin mínimo)
     fase_goleador: Mapped[str] = mapped_column(String(20), default="grupos")  # el ranking cuenta desde esta fase
     fase_valla: Mapped[str] = mapped_column(String(20), default="semifinal")
     descanso_min: Mapped[int] = mapped_column(Integer, default=10)  # descanso entre periodos (AMF: 10 min)

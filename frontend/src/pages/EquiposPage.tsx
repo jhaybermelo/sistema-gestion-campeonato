@@ -105,6 +105,7 @@ function Detalle({ id, onDeleted }: { id: number; onDeleted: () => void }) {
   if (!e) return <div className="card">Cargando…</div>
   const jugadores = e.jugadores ?? []
   const maximo = e.max_jugadores ?? 12
+  const minimo = e.min_jugadores ?? 0
   const lleno = jugadores.length >= maximo
   const puedeEditar = !!e.puede_editar_plantel
   const siguienteNumero = Math.max(0, ...jugadores.map((j) => j.numero)) + 1
@@ -149,6 +150,11 @@ function Detalle({ id, onDeleted }: { id: number; onDeleted: () => void }) {
       {/* Estado de la planilla */}
       <div className={clsx('flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-sm', e.planilla_cerrada ? 'bg-slate-100 text-slate-700' : 'bg-emerald-50 text-emerald-900')}>
         <span className="font-bold">Planilla: {jugadores.length}/{maximo} jugadores</span>
+        {minimo > 0 && (
+          <span className={clsx('rounded px-2 py-0.5 text-xs font-semibold', jugadores.length < minimo ? 'bg-amber-200 text-amber-900' : 'bg-emerald-200 text-emerald-900')}>
+            {jugadores.length < minimo ? `Faltan ${minimo - jugadores.length} para el mínimo (${minimo})` : `Mínimo ${minimo} cumplido`}
+          </span>
+        )}
         {esDelegado && !e.es_propio ? (
           <span className="flex items-center gap-1">{e.planilla_cerrada && <Lock size={14} />} Solo lectura: es un equipo rival de tu categoría{e.planilla_cerrada ? ' (planilla cerrada).' : '.'}</span>
         ) : e.planilla_cerrada ? (

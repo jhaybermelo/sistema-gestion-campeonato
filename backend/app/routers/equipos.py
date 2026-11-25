@@ -133,6 +133,7 @@ async def listar_equipos(
         _equipo(
             e, cats.get(e.categoria_id), n=cuentas.get(e.id, 0),
             es_propio=e.id in propios, planilla_cerrada=e.id in cerradas, max_jugadores=cfg.max_jugadores,
+            min_jugadores=cfg.min_jugadores,
         )
         for e in (await db.execute(q)).scalars()
     ]
@@ -165,7 +166,7 @@ async def obtener_equipo(
     return _equipo(
         e, await _categoria(db, e.categoria_id), jugadores=await _jugadores_activos(db, equipo_id),
         es_propio=es_propio, planilla_cerrada=cerrada, max_jugadores=cfg.max_jugadores,
-        puede_editar_plantel=puede_editar,
+        min_jugadores=cfg.min_jugadores, puede_editar_plantel=puede_editar,
     )
 
 

@@ -34,6 +34,7 @@ def _migrar(conn):
         "eventos": [("motivo", "VARCHAR(20)")],
         "config": [
             ("max_jugadores", "INTEGER NOT NULL DEFAULT 12"),
+            ("min_jugadores", "INTEGER NOT NULL DEFAULT 0"),
             ("fase_goleador", "VARCHAR(20) NOT NULL DEFAULT 'grupos'"),
             ("fase_valla", "VARCHAR(20) NOT NULL DEFAULT 'semifinal'"),
             ("descanso_min", "INTEGER NOT NULL DEFAULT 10"),

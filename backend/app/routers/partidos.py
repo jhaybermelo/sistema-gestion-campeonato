@@ -1,7 +1,7 @@
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import reloj
@@ -138,6 +138,23 @@ async def aplicar_reglas(db: AsyncSession, p: Partido, pj_id: int | None) -> Non
         elif len(base) < n:
             for e in auto:
                 await db.delete(e)
+
+
+async def _verificar_minimo(db: AsyncSession, p: Partido) -> None:
+    """Antes de iniciar, cada equipo debe tener en la planilla al menos el mínimo configurado."""
+    minimo = (await db.get(Config, 1)).min_jugadores
+    if not minimo:
+        return
+    for eid in (p.local_id, p.visitante_id):
+        n = (await db.execute(
+            select(func.count()).select_from(PartidoJugador).where(
+                PartidoJugador.partido_id == p.id, PartidoJugador.equipo_id == eid, PartidoJugador.convocado)
+        )).scalar_one()
+        if n < minimo:
+            equipo = await db.get(Equipo, eid)
+            raise HTTPException(
+                400, f"{equipo.nombre} tiene {n} jugadores convocados y el mínimo para jugar es {minimo}. "
+                     "Inscribe más jugadores o ajusta el mínimo en Ajustes.")
 
 
 def _verificar_ambito(amb: set[int] | None, p: Partido) -> None:
@@ -279,6 +296,7 @@ async def iniciar(partido_id: int, db: AsyncSession = Depends(get_db)):
         return await _responder(db, p)
     if p.estado == "programado":
         await sincronizar_planilla(db, p)
+        await _verificar_minimo(db, p)
         p.estado = "en_juego"
         p.periodo = 1
         p.restante_seg = p.duracion_seg

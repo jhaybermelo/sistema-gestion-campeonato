@@ -16,7 +16,8 @@ goles, tarjetas (amarilla, azul, roja) y faltas; tabla de posiciones, goleadores
 Todo el sistema exige iniciar sesión. Un delegado solo ve datos de las categorías de sus equipos.
 
 ## Planilla de jugadores
-- Cada equipo inscribe como máximo **12 jugadores** (se cambia en *Ajustes → Jugadores por planilla*).
+- Cada equipo inscribe como máximo **12 jugadores** (se cambia en *Ajustes → Máximo de jugadores por planilla*).
+- El **mínimo de jugadores para jugar** también es configurable en *Ajustes* (0 = sin mínimo; la AMF indica 7). Si no se cumple, el partido no se puede iniciar.
 - La planilla **se cierra cuando el equipo inicia su primer partido**: desde ahí el delegado ya no puede inscribir, editar ni dar de baja. El administrador sí puede corregirla (respetando el máximo).
 - Antes de que un partido inicie, su planilla se sincroniza con los jugadores inscritos (altas, bajas y correcciones).
 - Si la categoría tiene *año mínimo de competencia*, se valida el año de nacimiento al inscribir.
