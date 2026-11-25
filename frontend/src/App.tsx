@@ -18,18 +18,19 @@ import ConfigPage from './pages/ConfigPage'
 import UsuariosPage from './pages/UsuariosPage'
 import CuentaPage from './pages/CuentaPage'
 
+// 'todos' = admin, planillero y delegado. El planillero no ve Equipos; el delegado sí (sus planillas y las de su categoría).
 const TABS = [
-  { to: '/partidos', label: 'Partidos', icon: CalendarDays, admin: false },
-  { to: '/categorias', label: 'Categorías', icon: Layers, admin: true },
-  { to: '/equipos', label: 'Equipos', icon: Shield, admin: true },
-  { to: '/tabla', label: 'Tabla', icon: Trophy, admin: false },
-  { to: '/estadisticas', label: 'Goleadores', icon: BarChart3, admin: false },
-  { to: '/usuarios', label: 'Usuarios', icon: Users, admin: true },
-  { to: '/config', label: 'Ajustes', icon: Settings, admin: true },
+  { to: '/partidos', label: 'Partidos', icon: CalendarDays, roles: ['admin', 'planillero', 'delegado'] },
+  { to: '/categorias', label: 'Categorías', icon: Layers, roles: ['admin'] },
+  { to: '/equipos', label: 'Equipos', icon: Shield, roles: ['admin', 'delegado'] },
+  { to: '/tabla', label: 'Tabla', icon: Trophy, roles: ['admin', 'planillero', 'delegado'] },
+  { to: '/estadisticas', label: 'Goleadores', icon: BarChart3, roles: ['admin', 'planillero', 'delegado'] },
+  { to: '/usuarios', label: 'Usuarios', icon: Users, roles: ['admin'] },
+  { to: '/config', label: 'Ajustes', icon: Settings, roles: ['admin'] },
 ]
 
 function Layout() {
-  const { user, esAdmin, logout } = useAuth()
+  const { user, logout } = useAuth()
   const navRef = useRef<HTMLElement>(null)
   const { pathname } = useLocation()
   // En móvil el menú se desliza: llevamos la pestaña activa a la vista.
@@ -51,7 +52,7 @@ function Layout() {
             </button>
           </div>
           <nav ref={navRef} className="order-3 -mx-4 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto px-4 pb-2 pt-1 [scrollbar-width:none] lg:order-2 lg:mx-0 lg:w-auto lg:p-0 [&::-webkit-scrollbar]:hidden">
-            {TABS.filter((t) => esAdmin || !t.admin).map(({ to, label, icon: Icon }) => (
+            {TABS.filter((t) => user && t.roles.includes(user.rol)).map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
@@ -96,7 +97,7 @@ export default function App() {
         <Route path="/estadisticas" element={<EstadisticasPage />} />
         <Route path="/cuenta" element={<CuentaPage />} />
         <Route path="/categorias" element={<SoloAdmin><CategoriasPage /></SoloAdmin>} />
-        <Route path="/equipos" element={<SoloAdmin><EquiposPage /></SoloAdmin>} />
+        <Route path="/equipos" element={<EquiposPage />} />
         <Route path="/usuarios" element={<SoloAdmin><UsuariosPage /></SoloAdmin>} />
         <Route path="/config" element={<SoloAdmin><ConfigPage /></SoloAdmin>} />
         <Route path="*" element={<Navigate to="/partidos" replace />} />

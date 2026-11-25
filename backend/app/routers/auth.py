@@ -1,4 +1,5 @@
 import time
+from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
@@ -8,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import usuario_actual
-from app.models import Usuario
+from app.models import Usuario, UsuarioEquipo
 from app.schemas import In
 from app.security import HASH_RELLENO, crear_token, hash_password, verificar_password
 
@@ -29,8 +30,23 @@ class CambioPassword(In):
     nueva: str = Field(min_length=8, max_length=72)
 
 
-def perfil(u: Usuario) -> dict:
-    return {"id": u.id, "usuario": u.usuario, "nombre": u.nombre, "rol": u.rol, "activo": u.activo}
+async def perfiles(db: AsyncSession, usuarios: list[Usuario]) -> list[dict]:
+    """Datos públicos de usuarios (nunca el hash), con los equipos que representa cada delegado."""
+    ids = [u.id for u in usuarios]
+    equipos: dict[int, list[int]] = defaultdict(list)
+    if ids:
+        q = select(UsuarioEquipo.usuario_id, UsuarioEquipo.equipo_id).where(UsuarioEquipo.usuario_id.in_(ids))
+        for uid, eid in (await db.execute(q)).all():
+            equipos[uid].append(eid)
+    return [
+        {"id": u.id, "usuario": u.usuario, "nombre": u.nombre, "rol": u.rol, "activo": u.activo,
+         "equipo_ids": sorted(equipos[u.id])}
+        for u in usuarios
+    ]
+
+
+async def perfil(db: AsyncSession, u: Usuario) -> dict:
+    return (await perfiles(db, [u]))[0]
 
 
 @router.post("/login")
@@ -47,12 +63,12 @@ async def login(data: LoginIn, request: Request, db: AsyncSession = Depends(get_
         _fallos[clave] = recientes
         raise HTTPException(401, "Usuario o contraseña incorrectos")
     _fallos.pop(clave, None)
-    return {"token": crear_token(u.id), "usuario": perfil(u)}
+    return {"token": crear_token(u.id), "usuario": await perfil(db, u)}
 
 
 @router.get("/me")
-async def me(u: Usuario = Depends(usuario_actual)):
-    return perfil(u)
+async def me(u: Usuario = Depends(usuario_actual), db: AsyncSession = Depends(get_db)):
+    return await perfil(db, u)
 
 
 @router.post("/cambiar-password", status_code=204)

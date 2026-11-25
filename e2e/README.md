@@ -15,7 +15,8 @@ DATABASE_URL=sqlite+aiosqlite:///./data/e2e.db ADMIN_PASSWORD=Prueba-1234 \
 cd e2e && npm install
 ADMIN_PASSWORD=Prueba-1234 node movil.mjs   # 17 vistas x 3 tamaños: desbordes, botones táctiles, zoom iOS
 ADMIN_PASSWORD=Prueba-1234 node login.mjs   # login, roles y permisos
+ADMIN_PASSWORD=Prueba-1234 node delegado.mjs # rol delegado: planilla de 12, cierre, solo lectura, rankings
 ```
 
 Cada ejecución crea datos de prueba: **borra `backend/data/e2e.db*` antes de repetir**.
-`movil.mjs` guarda capturas en `e2e/shots/`.
+`movil.mjs` (incluye las vistas del delegado) guarda capturas en `e2e/shots/`.

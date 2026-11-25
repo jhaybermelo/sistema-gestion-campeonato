@@ -81,12 +81,13 @@ interface PanelProps {
   p: PartidoDetalle
   lado: LadoPartido
   activo: boolean
+  lectura: boolean // el delegado solo consulta
   onEvento: (tipo: TipoEvento, equipoId: number, j: JugadorPlanilla | null) => void
   onConvocar: (pjId: number, v: boolean) => void
   onAgregar: (d: object) => void
 }
 
-function PanelEquipo({ p, lado, activo, onEvento, onConvocar, onAgregar }: PanelProps) {
+function PanelEquipo({ p, lado, activo, lectura, onEvento, onConvocar, onAgregar }: PanelProps) {
   const [editando, setEditando] = useState(false)
   const [nuevo, setNuevo] = useState(false)
   const faltas = lado.faltas[String(p.periodo)] ?? 0
@@ -120,7 +121,7 @@ function PanelEquipo({ p, lado, activo, onEvento, onConvocar, onAgregar }: Panel
                 {j.faltas > 0 && <Chip className="bg-slate-200 text-slate-700">F{j.faltas}</Chip>}
               </span>
             </span>
-            {!editando && (
+            {!editando && !lectura && (
               <div className="grid w-full grid-cols-6 gap-1.5 sm:flex sm:w-auto sm:gap-1">
                 <button disabled={!activo} title="Gol" className={clsx(btn, 'bg-slate-900 text-white')} onClick={() => onEvento('gol', lado.id, j)}>⚽</button>
                 <button disabled={!activo} title="Falta" className={clsx(btn, 'bg-slate-200 text-slate-700')} onClick={() => onEvento('falta', lado.id, j)}>F</button>
@@ -139,7 +140,7 @@ function PanelEquipo({ p, lado, activo, onEvento, onConvocar, onAgregar }: Panel
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      {!lectura && <div className="mt-3 flex flex-wrap gap-2">
         {!editando && (
           <button disabled={!activo} className="btn btn-sec !py-2.5 sm:!py-1.5" onClick={() => onEvento('falta', lado.id, null)}>
             + Falta del equipo
@@ -151,7 +152,7 @@ function PanelEquipo({ p, lado, activo, onEvento, onConvocar, onAgregar }: Panel
         {editando && (
           <button className="btn btn-sec !py-2.5 sm:!py-1.5" onClick={() => setNuevo(true)}><UserPlus size={14} /> Jugador nuevo</button>
         )}
-      </div>
+      </div>}
       {editando && <p className="mt-1 text-xs text-slate-500">Marca solo a los jugadores que asistieron al partido.</p>}
       {nuevo && <FormJugador lado={lado} onAdd={onAgregar} onClose={() => setNuevo(false)} />}
     </div>
@@ -160,7 +161,7 @@ function PanelEquipo({ p, lado, activo, onEvento, onConvocar, onAgregar }: Panel
 
 export default function PartidoLivePage() {
   const id = Number(useParams().id)
-  const { esAdmin } = useAuth()
+  const { esAdmin, puedeOperar } = useAuth()
   const qc = useQueryClient()
   const key = ['partido', id]
   const { data: p, isLoading, isError } = useQuery({
@@ -267,7 +268,7 @@ export default function PartidoLivePage() {
           <div className="text-lg font-bold sm:text-2xl">{p.visitante.nombre}</div>
         </div>
         <div className="mt-2 text-center text-xs text-slate-400">
-          {p.categoria && <b>{p.categoria} · </b>}{fmtFecha(p.fecha)} {p.hora ?? ''} {p.cancha && `· ${p.cancha}`} {p.jornada && `· ${p.jornada}`}
+          {p.categoria && <b>{p.categoria} · </b>}<b>{p.fase_nombre} · </b>{fmtFecha(p.fecha)} {p.hora ?? ''} {p.cancha && `· ${p.cancha}`} {p.jornada && `· ${p.jornada}`}
         </div>
         <div className="mt-3 text-center text-sm font-semibold tracking-widest text-emerald-400">{etiquetaPeriodo}</div>
         <div className={clsx('text-center font-mono text-7xl font-extrabold tabular-nums sm:text-8xl', p.corriendo ? 'text-emerald-400' : sinTiempo && enJuego ? 'text-red-500' : 'text-white')}>
@@ -275,25 +276,25 @@ export default function PartidoLivePage() {
         </div>
 
         <div className="mt-4 flex flex-wrap justify-center gap-2">
-          {p.estado === 'programado' && (
+          {puedeOperar && p.estado === 'programado' && (
             <button className="btn btn-pri !px-8 !py-3 !text-lg" disabled={pendiente} onClick={() => accion.mutate({ ruta: 'iniciar' })}><Play size={22} /> Iniciar partido</button>
           )}
-          {enJuego && p.corriendo && (
+          {puedeOperar && enJuego && p.corriendo && (
             <button className="btn btn-del !px-8 !py-3 !text-lg" disabled={pendiente} onClick={() => accion.mutate({ ruta: 'pausar' })}><Pause size={22} /> Parar</button>
           )}
-          {enJuego && !p.corriendo && !sinTiempo && (
+          {puedeOperar && enJuego && !p.corriendo && !sinTiempo && (
             <button className="btn btn-pri !px-8 !py-3 !text-lg" disabled={pendiente} onClick={() => accion.mutate({ ruta: 'iniciar' })}><Play size={22} /> Reanudar</button>
           )}
-          {enJuego && !p.corriendo && !ultimoTiempo && (
+          {puedeOperar && enJuego && !p.corriendo && !ultimoTiempo && (
             <button className={clsx('btn !py-3', sinTiempo ? 'btn-pri !px-6 !text-lg' : 'bg-white/10 text-white hover:bg-white/20')} disabled={pendiente}
               onClick={() => (sinTiempo || confirm('Aún queda tiempo en este periodo. ¿Pasar al siguiente tiempo?')) && accion.mutate({ ruta: 'siguiente-tiempo' })}>
               <SkipForward size={18} /> Pasar al {p.periodo + 1}º tiempo
             </button>
           )}
-          {enJuego && !p.corriendo && (
+          {puedeOperar && enJuego && !p.corriendo && (
             <button className="btn bg-white/10 text-white hover:bg-white/20" onClick={ajustar}><Timer size={16} /> Ajustar tiempo</button>
           )}
-          {enJuego && (
+          {puedeOperar && enJuego && (
             <button className={clsx('btn', sinTiempo && ultimoTiempo ? 'btn-pri !px-6 !py-3 !text-lg' : 'bg-white/10 text-white hover:bg-white/20')} disabled={pendiente}
               onClick={() => confirm('¿Finalizar el partido? El resultado se sumará a la tabla de posiciones.') && accion.mutate({ ruta: 'finalizar' })}>
               <Flag size={16} /> Finalizar partido
@@ -306,14 +307,15 @@ export default function PartidoLivePage() {
             <Link to={`/partidos/${p.id}/acta`} target="_blank" className="btn bg-white/10 text-white hover:bg-white/20"><Printer size={16} /> Acta</Link>
           )}
         </div>
-        {p.estado === 'programado' && <p className="mt-3 text-center text-sm text-slate-400">Revisa la planilla y pulsa <b>Iniciar partido</b>. Los goles, tarjetas y faltas se habilitan al iniciar.</p>}
+        {!puedeOperar && <p className="mt-3 text-center text-sm text-slate-400">Vista de solo lectura.</p>}
+        {puedeOperar && p.estado === 'programado' && <p className="mt-3 text-center text-sm text-slate-400">Revisa la planilla y pulsa <b>Iniciar partido</b>. Los goles, tarjetas y faltas se habilitan al iniciar.</p>}
       </div>
 
       {/* Planillas */}
       <div className="grid gap-4 lg:grid-cols-2">
         {[p.local, p.visitante].map((l) => (
           <PanelEquipo
-            key={l.id} p={p} lado={l} activo={enJuego}
+            key={l.id} p={p} lado={l} activo={enJuego && puedeOperar} lectura={!puedeOperar}
             onEvento={registrar}
             onConvocar={(pjId, v) => convocar.mutate({ pjId, v })}
             onAgregar={(d) => agregar.mutate(d)}
@@ -333,7 +335,7 @@ export default function PartidoLivePage() {
                 <span className="w-20 shrink-0 font-mono text-slate-500">{ev.periodo}T {fmtTiempo(ev.segundo)}</span>
                 <span className="font-medium sm:w-40">{EVENTO[ev.tipo].icono} {EVENTO[ev.tipo].nombre}</span>
                 <span className="order-3 basis-full sm:order-none sm:basis-auto sm:flex-1">{ev.nombre ? `#${ev.numero} ${ev.nombre}` : '(equipo)'} <span className="text-slate-400">— {equipo}</span></span>
-                {!fin && (
+                {!fin && puedeOperar && (
                   <button title="Eliminar evento" className="order-2 ml-auto flex h-10 w-10 items-center justify-center rounded text-red-500 hover:bg-red-50 sm:order-none sm:h-8 sm:w-8"
                     onClick={() => confirm('¿Eliminar este evento?') && deshacer.mutate(ev.id)}><X size={16} /></button>
                 )}

@@ -18,9 +18,18 @@ class Usuario(Base):
     usuario: Mapped[str] = mapped_column(String(30), unique=True)  # siempre en minúsculas
     nombre: Mapped[str] = mapped_column(String(100))
     password_hash: Mapped[str] = mapped_column(String(100))
-    rol: Mapped[str] = mapped_column(String(15), default="planillero")  # admin | planillero
+    rol: Mapped[str] = mapped_column(String(15), default="planillero")  # admin | planillero | delegado
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
     creado: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class UsuarioEquipo(Base):
+    """Equipos que representa un delegado (puede tener varios, de distintas categorías)."""
+
+    __tablename__ = "usuario_equipos"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    equipo_id: Mapped[int] = mapped_column(ForeignKey("equipos.id"), index=True)
 
 
 class Config(Base):
@@ -33,6 +42,9 @@ class Config(Base):
     pts_ganado: Mapped[int] = mapped_column(Integer, default=3)
     pts_empate: Mapped[int] = mapped_column(Integer, default=1)
     pts_perdido: Mapped[int] = mapped_column(Integer, default=0)
+    max_jugadores: Mapped[int] = mapped_column(Integer, default=12)  # tamaño de la planilla de cada equipo
+    fase_goleador: Mapped[str] = mapped_column(String(20), default="grupos")  # el ranking cuenta desde esta fase
+    fase_valla: Mapped[str] = mapped_column(String(20), default="semifinal")
 
 
 class Categoria(Base):
@@ -74,6 +86,7 @@ class Partido(Base):
     hora: Mapped[time | None] = mapped_column(Time, nullable=True)
     cancha: Mapped[str] = mapped_column(String(80), default="")
     jornada: Mapped[str] = mapped_column(String(80), default="")
+    fase: Mapped[str] = mapped_column(String(20), default="grupos")
     estado: Mapped[str] = mapped_column(String(15), default="programado")  # programado|en_juego|finalizado
     # Cronómetro (cuenta regresiva). La fuente de verdad es el servidor.
     duracion_seg: Mapped[int] = mapped_column(Integer)

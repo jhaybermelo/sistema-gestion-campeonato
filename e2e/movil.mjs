@@ -36,6 +36,10 @@ await llamar('POST', `/partidos/${fin.id}/iniciar`, null, token)
 const df = await llamar('GET', `/partidos/${fin.id}`, null, token)
 await llamar('POST', `/partidos/${fin.id}/eventos`, { tipo: 'gol', equipo_id: eqC.id, pj_id: df.local.jugadores[0].id }, token)
 await llamar('POST', `/partidos/${fin.id}/finalizar`, null, token)
+const eqE = await llamar('POST', '/equipos', { nombre: 'Leones del Valle Sur', categoria_id: cat.id }, token)
+for (let i = 0; i < 5; i++) await llamar('POST', `/equipos/${eqE.id}/jugadores`, { numero: i + 1, nombre: nombres[i], anio_nacimiento: 1970 + i }, token)
+await llamar('POST', '/usuarios', { usuario: 'del1', nombre: 'Delegado de Prueba', password: 'clave-del-1', rol: 'delegado', equipo_ids: [eqA.id, eqE.id] }, token)
+const tokenDel = (await llamar('POST', '/auth/login', { usuario: 'del1', password: 'clave-del-1' })).token
 await llamar('POST', '/usuarios', { usuario: 'mesa1', nombre: 'Mesa de Control Uno', password: 'clave-mesa-1', rol: 'planillero' }, token)
 
 // ---------- recorrido ----------
@@ -126,6 +130,43 @@ for (const vp of VIEWPORTS) {
   await page.getByRole('button', { name: /Editar/ }).first().click()
   await revisar('equipo-editar')
   await ctx.close()
+
+  // ---- delegado (solo lectura + su planilla)
+  const ctxD = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, isMobile: vp.width < 600, hasTouch: true, deviceScaleFactor: 2 })
+  await ctxD.addInitScript((t) => localStorage.setItem('pitazo_token', t), tokenDel)
+  const pd = await ctxD.newPage()
+  pd.on('pageerror', (e) => errores.push(`${vp.nombre} (delegado): ${e.message}`))
+  const revisarD = async (nombre) => {
+    await pd.waitForTimeout(700)
+    const m = await pd.evaluate(medir)
+    await pd.screenshot({ path: `${OUT}/${vp.nombre}-del-${nombre}.png`, fullPage: true })
+    const mal = m.scrollW > m.W + 1 || m.fuera.length
+    console.log(`${mal ? 'PROBLEMA' : 'ok      '} ${vp.nombre.padEnd(9)} ${('del-' + nombre).padEnd(22)} ancho=${m.scrollW}/${m.W}`)
+    if (mal) { console.log('   fuera de pantalla:', m.fuera.join(' | ')); problemas.push(`${vp.nombre}/del-${nombre}`) }
+    if (m.chicos.length && vp.width < 600) console.log('   táctiles pequeños:', m.chicos.join(' | '))
+    if (m.zoomIOS.length && vp.width < 600) console.log('   ZOOM iOS (letra <16px):', m.zoomIOS.join(' | '))
+  }
+  await pd.goto(BASE + '/partidos'); await revisarD('partidos')
+  await pd.goto(BASE + `/partidos/${live.id}`); await revisarD('partido-lectura')
+  await pd.goto(BASE + '/equipos'); await revisarD('equipos')
+  await pd.getByRole('button', { name: /Leones del Valle Sur/ }).first().click(); await pd.getByText(/Planilla: 5\/12/).waitFor(); await revisarD('planilla-abierta')
+  await pd.getByRole('button', { name: /Deportivo Los Halcones del Norte/ }).first().click(); await pd.getByText(/Cerrada/).waitFor(); await revisarD('planilla-cerrada')
+  await pd.getByRole('button', { name: /Atlético Tigres Unidos FC/ }).first().click(); await pd.getByText(/Solo lectura/).waitFor(); await revisarD('planilla-rival')
+  await pd.goto(BASE + '/tabla'); await revisarD('tabla')
+  await pd.goto(BASE + '/estadisticas'); await revisarD('estadisticas')
+  await ctxD.close()
+
+  // ---- admin: usuarios con rol delegado y ajustes de fases
+  const ctxA = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, isMobile: vp.width < 600, hasTouch: true, deviceScaleFactor: 2 })
+  await ctxA.addInitScript((t) => localStorage.setItem('pitazo_token', t), token)
+  const pa = await ctxA.newPage()
+  await pa.goto(BASE + '/usuarios'); await pa.locator('form select').first().selectOption('delegado'); await pa.getByText('Equipos que representa').waitFor()
+  { const m = await pa.evaluate(medir); await pa.screenshot({ path: `${OUT}/${vp.nombre}-usuarios-delegado.png`, fullPage: true })
+    const mal = m.scrollW > m.W + 1 || m.fuera.length
+    console.log(`${mal ? 'PROBLEMA' : 'ok      '} ${vp.nombre.padEnd(9)} ${'usuarios-delegado'.padEnd(22)} ancho=${m.scrollW}/${m.W}`)
+    if (mal) { console.log('   fuera de pantalla:', m.fuera.join(' | ')); problemas.push(`${vp.nombre}/usuarios-delegado`) }
+    if (m.zoomIOS.length && vp.width < 600) console.log('   ZOOM iOS (letra <16px):', m.zoomIOS.join(' | ')) }
+  await ctxA.close()
 
   // login sin sesión
   const ctx2 = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, isMobile: vp.width < 600, hasTouch: true, deviceScaleFactor: 2 })

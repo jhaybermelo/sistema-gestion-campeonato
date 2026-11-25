@@ -11,8 +11,27 @@ goles, tarjetas (amarilla, azul, roja) y faltas; tabla de posiciones, goleadores
 |---|---|
 | **Administrador** | Todo: categorías, equipos, jugadores, partidos, ajustes, usuarios, respaldo. |
 | **Planillero** | Consultar y operar partidos (cronómetro, planilla, eventos). No crea ni borra datos maestros. |
+| **Delegado** | Representa a uno o varios equipos (pueden ser de distintas categorías). Inscribe a los jugadores de **su** equipo; ve las planillas de los demás equipos de sus categorías, los partidos, la tabla, los goleadores y la valla menos vencida. No opera partidos. |
 
-Todo el sistema exige iniciar sesión.
+Todo el sistema exige iniciar sesión. Un delegado solo ve datos de las categorías de sus equipos.
+
+## Planilla de jugadores
+- Cada equipo inscribe como máximo **12 jugadores** (se cambia en *Ajustes → Jugadores por planilla*).
+- La planilla **se cierra cuando el equipo inicia su primer partido**: desde ahí el delegado ya no puede inscribir, editar ni dar de baja. El administrador sí puede corregirla (respetando el máximo).
+- Antes de que un partido inicie, su planilla se sincroniza con los jugadores inscritos (altas, bajas y correcciones).
+- Si la categoría tiene *año mínimo de competencia*, se valida el año de nacimiento al inscribir.
+
+## Fases y rankings
+Cada partido tiene una **fase**: Fase de grupos, Octavos, Cuartos, Semifinal, Tercer puesto o Final.
+En *Ajustes* se elige desde qué fase cuenta cada ranking; cuenta esa fase y las posteriores
+(«Semifinal» incluye semifinal, tercer puesto y final).
+
+| Ranking | Cálculo | Por defecto |
+|---|---|---|
+| **Goleador** | goles ÷ partidos finalizados de su equipo (mayor promedio primero) | desde la fase de grupos |
+| **Valla menos vencida** | goles en contra ÷ partidos del equipo (menor promedio primero) | desde la semifinal |
+
+La tabla de posiciones y las tarjetas cuentan todos los partidos.
 
 ## Ejecutar en local
 
@@ -51,7 +70,8 @@ usuario `admin` y una contraseña aleatoria que se imprime en la consola del ser
 cd backend
 export ADMIN_PASSWORD=Prueba-1234
 DATABASE_URL=sqlite+aiosqlite:///./data/prueba.db venv/Scripts/python tests/prueba_flujo.py
-# también: tests/prueba_categorias.py, tests/prueba_auth.py (usar una base nueva en cada ejecución)
+# también: tests/prueba_categorias.py, tests/prueba_auth.py, tests/prueba_delegado.py
+# (usar una base nueva en cada ejecución)
 ```
 
 ## Datos

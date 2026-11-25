@@ -50,7 +50,7 @@ export default function ActaPage() {
       <h1 className="text-center text-xl font-bold uppercase">{p.nombre_campeonato}</h1>
       <h2 className="mb-2 text-center text-lg font-semibold">Acta de juego</h2>
       <p className="mb-1 text-center text-sm">
-        Categoría: {p.categoria ?? '—'} · Fecha: {fmtFecha(p.fecha)} · Hora: {p.hora ?? '—'} · Cancha: {p.cancha || '—'} · Jornada: {p.jornada || '—'}
+        Categoría: {p.categoria ?? '—'} · Fase: {p.fase_nombre} · Fecha: {fmtFecha(p.fecha)} · Hora: {p.hora ?? '—'} · Cancha: {p.cancha || '—'} · Jornada: {p.jornada || '—'}
       </p>
       <p className="my-3 text-center text-2xl font-extrabold">
         {p.local.nombre} {p.goles_local} - {p.goles_visitante} {p.visitante.nombre}

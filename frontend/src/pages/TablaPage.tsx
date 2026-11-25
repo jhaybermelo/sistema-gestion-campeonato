@@ -1,15 +1,22 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useCategorias } from '../api/hooks'
+import { useAuth } from '../auth'
 import type { FilaTabla } from '../types'
 
 export default function TablaPage() {
+  const { esDelegado } = useAuth()
   const [cat, setCat] = useState('')
   const { data: categorias = [] } = useCategorias()
+  // Un delegado ve una categoría concreta (la tabla mezclando categorías no tiene sentido).
+  useEffect(() => {
+    if (esDelegado && !cat && categorias.length) setCat(String(categorias[0].id))
+  }, [esDelegado, cat, categorias])
   const { data = [] } = useQuery({
     queryKey: ['tabla', cat],
     queryFn: async () => (await api.get<FilaTabla[]>('/tabla', { params: cat ? { categoria_id: cat } : {} })).data,
+    enabled: !esDelegado || !!cat,
   })
   // En móvil se ocultan PG, PE y PP para que el equipo y los puntos siempre se vean.
   const num = 'px-1.5 py-2 text-center sm:px-2'
@@ -19,7 +26,7 @@ export default function TablaPage() {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-bold">Tabla de posiciones</h2>
         <select className="input !w-auto" value={cat} onChange={(e) => setCat(e.target.value)}>
-          <option value="">Todas las categorías</option>
+          {!esDelegado && <option value="">Todas las categorías</option>}
           {categorias.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
       </div>

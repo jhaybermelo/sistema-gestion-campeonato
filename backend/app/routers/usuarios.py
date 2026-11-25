@@ -2,32 +2,41 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
-from pydantic import Field
-from sqlalchemy import func, select
+from pydantic import Field, model_validator
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import solo_admin
-from app.models import Usuario
-from app.routers.auth import perfil
+from app.models import Equipo, Usuario, UsuarioEquipo
+from app.routers.auth import perfil, perfiles
 from app.schemas import In
 from app.security import hash_password
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"], dependencies=[Depends(solo_admin)])
 
-Rol = Literal["admin", "planillero"]
+Rol = Literal["admin", "planillero", "delegado"]
 
 
-class UsuarioNuevo(In):
+class _ConEquipos(In):
+    rol: Rol = "planillero"
+    equipo_ids: list[int] = []
+
+    @model_validator(mode="after")
+    def _delegado_necesita_equipos(self):
+        if self.rol == "delegado" and not self.equipo_ids:
+            raise ValueError("Un delegado debe tener al menos un equipo asignado")
+        return self
+
+
+class UsuarioNuevo(_ConEquipos):
     usuario: str = Field(pattern=r"^[A-Za-z0-9._-]{3,30}$")
     nombre: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=8, max_length=72)
-    rol: Rol = "planillero"
 
 
-class UsuarioEdit(In):
+class UsuarioEdit(_ConEquipos):
     nombre: str = Field(min_length=1, max_length=100)
-    rol: Rol
     activo: bool = True
     password: str | None = Field(None, min_length=8, max_length=72)  # solo si se quiere restablecer
 
@@ -37,9 +46,23 @@ async def _otros_admins(db: AsyncSession, excepto: int) -> int:
     return (await db.execute(q)).scalar_one()
 
 
+async def _asignar_equipos(db: AsyncSession, usuario_id: int, rol: str, equipo_ids: list[int]):
+    """Reemplaza los equipos del usuario. Solo los delegados tienen equipos."""
+    await db.execute(delete(UsuarioEquipo).where(UsuarioEquipo.usuario_id == usuario_id))
+    if rol != "delegado":
+        return
+    ids = sorted(set(equipo_ids))
+    existentes = set((await db.execute(select(Equipo.id).where(Equipo.id.in_(ids)))).scalars())
+    if existentes != set(ids):
+        raise HTTPException(400, "Alguno de los equipos seleccionados no existe")
+    for eid in ids:
+        db.add(UsuarioEquipo(usuario_id=usuario_id, equipo_id=eid))
+
+
 @router.get("")
 async def listar(db: AsyncSession = Depends(get_db)):
-    return [perfil(u) for u in (await db.execute(select(Usuario).order_by(Usuario.nombre))).scalars()]
+    usuarios = list((await db.execute(select(Usuario).order_by(Usuario.nombre))).scalars())
+    return await perfiles(db, usuarios)
 
 
 @router.post("", status_code=201)
@@ -52,8 +75,10 @@ async def crear(data: UsuarioNuevo, db: AsyncSession = Depends(get_db)):
         password_hash=await run_in_threadpool(hash_password, data.password),
     )
     db.add(u)
+    await db.flush()
+    await _asignar_equipos(db, u.id, data.rol, data.equipo_ids)
     await db.commit()
-    return perfil(u)
+    return await perfil(db, u)
 
 
 @router.put("/{uid}")
@@ -69,8 +94,9 @@ async def editar(uid: int, data: UsuarioEdit, yo: Usuario = Depends(solo_admin),
     u.nombre, u.rol, u.activo = data.nombre, data.rol, data.activo
     if data.password:
         u.password_hash = await run_in_threadpool(hash_password, data.password)
+    await _asignar_equipos(db, uid, data.rol, data.equipo_ids)
     await db.commit()
-    return perfil(u)
+    return await perfil(db, u)
 
 
 @router.delete("/{uid}", status_code=204)
@@ -82,5 +108,6 @@ async def eliminar(uid: int, yo: Usuario = Depends(solo_admin), db: AsyncSession
         raise HTTPException(400, "No puedes eliminar tu propio usuario")
     if u.rol == "admin" and u.activo and await _otros_admins(db, uid) == 0:
         raise HTTPException(400, "Debe quedar al menos un administrador activo")
+    await db.execute(delete(UsuarioEquipo).where(UsuarioEquipo.usuario_id == uid))
     await db.delete(u)
     await db.commit()

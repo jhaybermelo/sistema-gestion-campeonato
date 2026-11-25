@@ -14,6 +14,7 @@ ssh -i ~/.ssh/<clave-del-droplet> root@<IP-del-droplet> \
 ```
 
 Los datos viven en el volumen Docker `pitazo_data` (SQLite) y **no se pierden** al actualizar.
+Si una versión agrega columnas o tablas, el servidor las migra solo al arrancar (probado contra una base de la versión anterior).
 
 ## Una sola vez: bloque en el Caddyfile del inventario
 

@@ -11,7 +11,7 @@ export default function ConfigPage() {
   const [f, setF] = useState<Config | null>(null)
   useEffect(() => { if (data) setF(data) }, [data])
   const guardar = useMutation({
-    mutationFn: () => api.put('/config', f),
+    mutationFn: () => api.put('/config', { ...f, fases: undefined }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['config'] }); toast.success('Configuración guardada') },
     onError: errorToast,
   })
@@ -51,7 +51,25 @@ export default function ConfigPage() {
           {num('pts_empate', 'Puntos por empatar')}
           {num('pts_perdido', 'Puntos por perder')}
         </div>
-        <p className="text-xs text-slate-500">La duración y el número de tiempos aplican a los partidos que crees desde ahora.</p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {num('max_jugadores', 'Jugadores por planilla')}
+          <div>
+            <label className="lbl">Goleador cuenta desde</label>
+            <select className="input" value={f.fase_goleador} onChange={(e) => setF({ ...f, fase_goleador: e.target.value })}>
+              {f.fases.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="lbl">Valla menos vencida cuenta desde</label>
+            <select className="input" value={f.fase_valla} onChange={(e) => setF({ ...f, fase_valla: e.target.value })}>
+              {f.fases.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+            </select>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500">
+          La planilla de cada equipo se cierra cuando inicia su primer partido. Los rankings cuentan los partidos de la fase elegida y de las posteriores
+          (por ejemplo, «Semifinal» incluye semifinal, tercer puesto y final). La duración y el número de tiempos aplican a los partidos que crees desde ahora.
+        </p>
         <button className="btn btn-pri" disabled={guardar.isPending}>Guardar</button>
       </form>
       <div className="card space-y-2">

@@ -4,6 +4,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+Fase = Literal["grupos", "octavos", "cuartos", "semifinal", "tercer_puesto", "final"]
+
+
 class In(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -16,6 +19,9 @@ class ConfigIn(In):
     pts_ganado: int = Field(ge=0, le=10)
     pts_empate: int = Field(ge=0, le=10)
     pts_perdido: int = Field(ge=0, le=10)
+    max_jugadores: int = Field(12, ge=5, le=30)
+    fase_goleador: Fase = "grupos"
+    fase_valla: Fase = "semifinal"
 
 
 class CategoriaIn(In):
@@ -52,6 +58,7 @@ class PartidoIn(In):
     hora: time | None = None
     cancha: str = Field("", max_length=80)
     jornada: str = Field("", max_length=80)
+    fase: Fase = "grupos"
 
 
 class PartidoEdit(In):
@@ -59,6 +66,7 @@ class PartidoEdit(In):
     hora: time | None = None
     cancha: str = Field("", max_length=80)
     jornada: str = Field("", max_length=80)
+    fase: Fase = "grupos"
 
 
 class EventoIn(In):

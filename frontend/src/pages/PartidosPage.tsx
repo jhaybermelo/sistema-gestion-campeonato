@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import clsx from 'clsx'
 import { api, errorToast, fmtFecha } from '../api/client'
 import { useAuth } from '../auth'
-import type { Equipo, PartidoDetalle, PartidoResumen } from '../types'
+import type { Config, Equipo, PartidoDetalle, PartidoResumen } from '../types'
 
 const ETIQUETA = { programado: 'Programado', en_juego: 'En juego', finalizado: 'Finalizado' } as const
 
@@ -25,6 +25,8 @@ function NuevoPartido({ onClose }: { onClose: () => void }) {
   const [hora, setHora] = useState('')
   const [cancha, setCancha] = useState('')
   const [jornada, setJornada] = useState('')
+  const [fase, setFase] = useState('grupos')
+  const { data: cfg } = useQuery({ queryKey: ['config'], queryFn: async () => (await api.get<Config>('/config')).data })
 
   const crear = useMutation({
     mutationFn: async () =>
@@ -36,6 +38,7 @@ function NuevoPartido({ onClose }: { onClose: () => void }) {
           hora: hora || null,
           cancha,
           jornada,
+          fase,
         })
       ).data,
     onSuccess: (p) => {
@@ -99,7 +102,13 @@ function NuevoPartido({ onClose }: { onClose: () => void }) {
               <input className="input" value={cancha} onChange={(e) => setCancha(e.target.value)} />
             </div>
             <div>
-              <label className="lbl">Jornada / fase (opcional)</label>
+              <label className="lbl">Fase del campeonato</label>
+              <select className="input" value={fase} onChange={(e) => setFase(e.target.value)}>
+                {(cfg?.fases ?? [{ id: 'grupos', nombre: 'Fase de grupos' }]).map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="lbl">Jornada (opcional)</label>
               <input className="input" placeholder="Ej: Fecha 3" value={jornada} onChange={(e) => setJornada(e.target.value)} />
             </div>
             <div className="mt-2 flex justify-end gap-2 sm:col-span-2">
@@ -114,7 +123,7 @@ function NuevoPartido({ onClose }: { onClose: () => void }) {
 }
 
 function Tarjeta({ p, onDelete }: { p: PartidoResumen; onDelete: () => void }) {
-  const { esAdmin } = useAuth()
+  const { esAdmin, puedeOperar } = useAuth()
   return (
     <div className="card flex flex-wrap items-center gap-3">
       <Link to={`/partidos/${p.id}`} className="min-w-[240px] flex-1">
@@ -126,14 +135,14 @@ function Tarjeta({ p, onDelete }: { p: PartidoResumen; onDelete: () => void }) {
           <span className="flex-1">{p.visitante}</span>
         </div>
         <div className="mt-1 text-center text-xs text-slate-500">
-          {p.categoria && <b>{p.categoria} · </b>}{fmtFecha(p.fecha)} {p.hora ?? ''} {p.cancha && `· ${p.cancha}`} {p.jornada && `· ${p.jornada}`}
+          {p.categoria && <b>{p.categoria} · </b>}<b>{p.fase_nombre}</b> · {fmtFecha(p.fecha)} {p.hora ?? ''} {p.cancha && `· ${p.cancha}`} {p.jornada && `· ${p.jornada}`}
         </div>
       </Link>
       <span className={clsx('rounded-full px-3 py-1 text-xs font-semibold',
         p.estado === 'en_juego' ? 'bg-emerald-100 text-emerald-800' : p.estado === 'finalizado' ? 'bg-slate-200 text-slate-600' : 'bg-amber-100 text-amber-800')}>
         {p.estado === 'en_juego' ? `● ${p.periodo}º tiempo` : ETIQUETA[p.estado]}
       </span>
-      <Link to={`/partidos/${p.id}`} className="btn btn-pri">{p.estado === 'finalizado' ? 'Ver' : p.estado === 'en_juego' ? 'Continuar' : 'Abrir'}</Link>
+      <Link to={`/partidos/${p.id}`} className="btn btn-pri">{p.estado === 'finalizado' || !puedeOperar ? 'Ver' : p.estado === 'en_juego' ? 'Continuar' : 'Abrir'}</Link>
       {esAdmin && <button className="btn btn-sec" title="Eliminar" onClick={onDelete}><Trash2 size={16} /></button>}
     </div>
   )

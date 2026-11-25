@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.deps import ambito_actual
 from app.deps import solo_admin
 from app.models import Categoria, Equipo, Jugador
 from app.schemas import CategoriaIn
@@ -63,12 +64,14 @@ async def _nombre_libre(db: AsyncSession, nombre: str, excepto: int | None = Non
 
 
 @router.get("/categorias")
-async def listar(db: AsyncSession = Depends(get_db)):
+async def listar(db: AsyncSession = Depends(get_db), amb: set[int] | None = Depends(ambito_actual)):
     cuentas = dict((await db.execute(
         select(Equipo.categoria_id, func.count()).where(Equipo.categoria_id.is_not(None)).group_by(Equipo.categoria_id)
     )).all())
-    cats = (await db.execute(select(Categoria).order_by(Categoria.nombre))).scalars()
-    return [_cat(c, cuentas.get(c.id, 0)) for c in cats]
+    q = select(Categoria).order_by(Categoria.nombre)
+    if amb is not None:
+        q = q.where(Categoria.id.in_(select(Equipo.categoria_id).where(Equipo.id.in_(amb))))
+    return [_cat(c, cuentas.get(c.id, 0)) for c in (await db.execute(q)).scalars()]
 
 
 @router.post("/categorias", status_code=201, dependencies=[Depends(solo_admin)])

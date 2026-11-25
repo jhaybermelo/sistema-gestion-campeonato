@@ -6,13 +6,16 @@ export interface Usuario {
   id: number
   usuario: string
   nombre: string
-  rol: 'admin' | 'planillero'
+  rol: 'admin' | 'planillero' | 'delegado'
   activo: boolean
+  equipo_ids: number[]
 }
 
 interface AuthCtx {
   user: Usuario | null | undefined // undefined = comprobando sesión
   esAdmin: boolean
+  esDelegado: boolean
+  puedeOperar: boolean // admin y planillero operan partidos; el delegado solo consulta
   login: (usuario: string, password: string) => Promise<void>
   logout: () => void
 }
@@ -48,5 +51,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(r.data.usuario)
   }
 
-  return <Ctx.Provider value={{ user, esAdmin: user?.rol === 'admin', login, logout }}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{ user, esAdmin: user?.rol === 'admin', esDelegado: user?.rol === 'delegado', puedeOperar: !!user && user.rol !== 'delegado', login, logout }}>{children}</Ctx.Provider>
 }

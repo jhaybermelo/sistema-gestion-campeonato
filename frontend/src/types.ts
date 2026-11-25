@@ -9,6 +9,10 @@ export interface Config {
   pts_ganado: number
   pts_empate: number
   pts_perdido: number
+  max_jugadores: number
+  fase_goleador: string
+  fase_valla: string
+  fases: { id: string; nombre: string }[]
 }
 
 export interface Categoria {
@@ -39,6 +43,10 @@ export interface Equipo {
   limita_anio: boolean
   anio_minimo: number | null
   num_jugadores: number
+  es_propio?: boolean
+  planilla_cerrada?: boolean
+  max_jugadores?: number
+  puede_editar_plantel?: boolean
   jugadores?: Jugador[]
 }
 
@@ -50,6 +58,8 @@ export interface PartidoResumen {
   cancha: string
   jornada: string
   periodo: number
+  fase: string
+  fase_nombre: string
   categoria_id: number | null
   categoria: string | null
   local_id: number
@@ -105,6 +115,8 @@ export interface PartidoDetalle {
   hora: string | null
   cancha: string
   jornada: string
+  fase: string
+  fase_nombre: string
   categoria: string | null
   periodo: number
   num_tiempos: number
@@ -139,7 +151,24 @@ export interface FilaJugadorStats {
   nombre: string
   equipo: string
   goles: number
+  pj: number
+  promedio: number
   amarillas: number
   azules: number
   rojas: number
+}
+
+export interface FilaValla {
+  equipo_id: number
+  equipo: string
+  pj: number
+  gc: number
+  promedio: number
+}
+
+export interface Estadisticas {
+  goleadores: FilaJugadorStats[]
+  valla: FilaValla[]
+  tarjetas: FilaJugadorStats[]
+  reglas: { fase_goleador: string; fase_valla: string }
 }

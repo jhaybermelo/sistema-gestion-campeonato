@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import reloj
 from app.database import get_db
-from app.deps import solo_admin
+from app.deps import ambito_actual, operador, solo_admin
+from app.fases import NOMBRE
 from app.models import Categoria, Config, Equipo, Evento, Jugador, Partido, PartidoJugador
 from app.routers.equipos import validar_jugador_nuevo
 from app.schemas import AjusteIn, ConvocadoIn, EventoIn, PartidoEdit, PartidoIn, PlanillaJugadorIn
@@ -85,6 +86,7 @@ async def detalle(db: AsyncSession, p: Partido) -> dict:
         "id": p.id, "estado": p.estado, "fecha": p.fecha.isoformat(),
         "hora": p.hora.strftime("%H:%M") if p.hora else None,
         "cancha": p.cancha, "jornada": p.jornada,
+        "fase": p.fase, "fase_nombre": NOMBRE.get(p.fase, p.fase),
         "categoria": cats[equipos[p.local_id].categoria_id].nombre if equipos[p.local_id].categoria_id in cats else None,
         "periodo": p.periodo, "num_tiempos": p.num_tiempos, "duracion_seg": p.duracion_seg,
         "restante_seg": round(reloj.restante(p), 2), "corriendo": p.corriendo,
@@ -102,6 +104,36 @@ async def detalle(db: AsyncSession, p: Partido) -> dict:
     }
 
 
+def _verificar_ambito(amb: set[int] | None, p: Partido) -> None:
+    """Un delegado solo puede ver los partidos de los equipos de sus categorías."""
+    if amb is not None and p.local_id not in amb and p.visitante_id not in amb:
+        raise HTTPException(403, "Este partido no es de tus categorías")
+
+
+async def sincronizar_planilla(db: AsyncSession, p: Partido) -> None:
+    """Antes de jugarse, la planilla del partido refleja los jugadores inscritos por el delegado:
+    agrega los nuevos, actualiza datos corregidos y des-convoca a los dados de baja."""
+    pjs = list((await db.execute(select(PartidoJugador).where(PartidoJugador.partido_id == p.id))).scalars())
+    por_jugador = {(x.equipo_id, x.jugador_id): x for x in pjs}
+    activos = list((await db.execute(
+        select(Jugador).where(Jugador.equipo_id.in_([p.local_id, p.visitante_id]), Jugador.activo)
+    )).scalars())
+    vigentes = set()
+    for j in activos:
+        vigentes.add((j.equipo_id, j.id))
+        x = por_jugador.get((j.equipo_id, j.id))
+        if x is None:
+            db.add(PartidoJugador(
+                partido_id=p.id, equipo_id=j.equipo_id, jugador_id=j.id,
+                numero=j.numero, nombre=j.nombre, documento=j.documento,
+            ))
+        else:
+            x.numero, x.nombre, x.documento = j.numero, j.nombre, j.documento
+    for clave, x in por_jugador.items():
+        if clave not in vigentes:
+            x.convocado = False
+
+
 async def _responder(db: AsyncSession, p: Partido) -> dict:
     await db.commit()
     return await detalle(db, p)
@@ -110,7 +142,7 @@ async def _responder(db: AsyncSession, p: Partido) -> dict:
 # ---------- listado / CRUD ----------
 
 @router.get("/partidos")
-async def listar_partidos(db: AsyncSession = Depends(get_db)):
+async def listar_partidos(db: AsyncSession = Depends(get_db), amb: set[int] | None = Depends(ambito_actual)):
     partidos = list((await db.execute(select(Partido).order_by(Partido.fecha, Partido.hora, Partido.id))).scalars())
     todos = {e.id: e for e in (await db.execute(select(Equipo))).scalars()}
     nombres = {i: e.nombre for i, e in todos.items()}
@@ -120,12 +152,15 @@ async def listar_partidos(db: AsyncSession = Depends(get_db)):
         evs[ev.partido_id].append(ev)
     out = []
     for p in partidos:
+        if amb is not None and p.local_id not in amb and p.visitante_id not in amb:
+            continue
         reloj.normalizar(p)
         gl, gv = goles_por_equipo(evs[p.id], p.local_id, p.visitante_id)
         out.append({
             "id": p.id, "estado": p.estado, "fecha": p.fecha.isoformat(),
             "hora": p.hora.strftime("%H:%M") if p.hora else None,
             "cancha": p.cancha, "jornada": p.jornada, "periodo": p.periodo,
+            "fase": p.fase, "fase_nombre": NOMBRE.get(p.fase, p.fase),
             "categoria_id": todos[p.local_id].categoria_id if p.local_id in todos else None,
             "categoria": cats.get(todos[p.local_id].categoria_id) if p.local_id in todos else None,
             "local_id": p.local_id, "local": nombres.get(p.local_id),
@@ -170,8 +205,13 @@ async def crear_partido(data: PartidoIn, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/partidos/{partido_id}")
-async def obtener_partido(partido_id: int, db: AsyncSession = Depends(get_db)):
+async def obtener_partido(
+    partido_id: int, db: AsyncSession = Depends(get_db), amb: set[int] | None = Depends(ambito_actual)
+):
     p = await _get(db, partido_id)
+    _verificar_ambito(amb, p)
+    if p.estado == "programado":
+        await sincronizar_planilla(db, p)
     return await _responder(db, p)
 
 
@@ -194,7 +234,7 @@ async def eliminar_partido(partido_id: int, db: AsyncSession = Depends(get_db)):
 
 # ---------- cronómetro ----------
 
-@router.post("/partidos/{partido_id}/iniciar")
+@router.post("/partidos/{partido_id}/iniciar", dependencies=[Depends(operador)])
 async def iniciar(partido_id: int, db: AsyncSession = Depends(get_db)):
     p = await _get(db, partido_id)
     if p.estado == "finalizado":
@@ -202,6 +242,7 @@ async def iniciar(partido_id: int, db: AsyncSession = Depends(get_db)):
     if p.corriendo:
         return await _responder(db, p)
     if p.estado == "programado":
+        await sincronizar_planilla(db, p)
         p.estado = "en_juego"
         p.periodo = 1
         p.restante_seg = p.duracion_seg
@@ -212,14 +253,14 @@ async def iniciar(partido_id: int, db: AsyncSession = Depends(get_db)):
     return await _responder(db, p)
 
 
-@router.post("/partidos/{partido_id}/pausar")
+@router.post("/partidos/{partido_id}/pausar", dependencies=[Depends(operador)])
 async def pausar(partido_id: int, db: AsyncSession = Depends(get_db)):
     p = await _get(db, partido_id)
     reloj.congelar(p)
     return await _responder(db, p)
 
 
-@router.post("/partidos/{partido_id}/siguiente-tiempo")
+@router.post("/partidos/{partido_id}/siguiente-tiempo", dependencies=[Depends(operador)])
 async def siguiente_tiempo(partido_id: int, db: AsyncSession = Depends(get_db)):
     p = await _get(db, partido_id)
     if p.estado != "en_juego":
@@ -233,7 +274,7 @@ async def siguiente_tiempo(partido_id: int, db: AsyncSession = Depends(get_db)):
     return await _responder(db, p)
 
 
-@router.post("/partidos/{partido_id}/ajustar")
+@router.post("/partidos/{partido_id}/ajustar", dependencies=[Depends(operador)])
 async def ajustar(partido_id: int, data: AjusteIn, db: AsyncSession = Depends(get_db)):
     p = await _get(db, partido_id)
     if p.corriendo:
@@ -244,7 +285,7 @@ async def ajustar(partido_id: int, data: AjusteIn, db: AsyncSession = Depends(ge
     return await _responder(db, p)
 
 
-@router.post("/partidos/{partido_id}/finalizar")
+@router.post("/partidos/{partido_id}/finalizar", dependencies=[Depends(operador)])
 async def finalizar(partido_id: int, db: AsyncSession = Depends(get_db)):
     p = await _get(db, partido_id)
     if p.estado == "programado":
@@ -264,7 +305,7 @@ async def reabrir(partido_id: int, db: AsyncSession = Depends(get_db)):
 
 # ---------- planilla ----------
 
-@router.patch("/partidos/{partido_id}/planilla/{pj_id}")
+@router.patch("/partidos/{partido_id}/planilla/{pj_id}", dependencies=[Depends(operador)])
 async def convocar(partido_id: int, pj_id: int, data: ConvocadoIn, db: AsyncSession = Depends(get_db)):
     p = await _get(db, partido_id)
     pj = await db.get(PartidoJugador, pj_id)
@@ -274,7 +315,7 @@ async def convocar(partido_id: int, pj_id: int, data: ConvocadoIn, db: AsyncSess
     return await _responder(db, p)
 
 
-@router.post("/partidos/{partido_id}/planilla", status_code=201)
+@router.post("/partidos/{partido_id}/planilla", status_code=201, dependencies=[Depends(operador)])
 async def agregar_jugador(partido_id: int, data: PlanillaJugadorIn, db: AsyncSession = Depends(get_db)):
     """Registra un jugador nuevo en el equipo y lo agrega a la planilla de este partido."""
     p = await _get(db, partido_id)
@@ -294,7 +335,7 @@ async def agregar_jugador(partido_id: int, data: PlanillaJugadorIn, db: AsyncSes
 
 # ---------- eventos ----------
 
-@router.post("/partidos/{partido_id}/eventos", status_code=201)
+@router.post("/partidos/{partido_id}/eventos", status_code=201, dependencies=[Depends(operador)])
 async def registrar_evento(partido_id: int, data: EventoIn, db: AsyncSession = Depends(get_db)):
     p = await _get(db, partido_id)
     if p.estado == "programado":
@@ -319,7 +360,7 @@ async def registrar_evento(partido_id: int, data: EventoIn, db: AsyncSession = D
     return await _responder(db, p)
 
 
-@router.delete("/partidos/{partido_id}/eventos/{evento_id}")
+@router.delete("/partidos/{partido_id}/eventos/{evento_id}", dependencies=[Depends(operador)])
 async def eliminar_evento(partido_id: int, evento_id: int, db: AsyncSession = Depends(get_db)):
     p = await _get(db, partido_id)
     ev = await db.get(Evento, evento_id)

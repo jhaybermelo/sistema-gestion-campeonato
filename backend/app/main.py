@@ -24,6 +24,12 @@ def _migrar(conn):
     nuevas = {
         "equipos": [("categoria_id", "INTEGER REFERENCES categorias(id)")],
         "jugadores": [("anio_nacimiento", "INTEGER")],
+        "partidos": [("fase", "VARCHAR(20) NOT NULL DEFAULT 'grupos'")],
+        "config": [
+            ("max_jugadores", "INTEGER NOT NULL DEFAULT 12"),
+            ("fase_goleador", "VARCHAR(20) NOT NULL DEFAULT 'grupos'"),
+            ("fase_valla", "VARCHAR(20) NOT NULL DEFAULT 'semifinal'"),
+        ],
     }
     for tabla, cols in nuevas.items():
         existentes = {c["name"] for c in insp.get_columns(tabla)}
