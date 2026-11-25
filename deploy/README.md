@@ -16,6 +16,25 @@ ssh -i ~/.ssh/<clave-del-droplet> root@<IP-del-droplet> \
 Los datos viven en el volumen Docker `pitazo_data` (SQLite) y **no se pierden** al actualizar.
 Si una versión agrega columnas o tablas, el servidor las migra solo al arrancar (probado contra una base de la versión anterior).
 
+## Antes de actualizar: respaldo y punto de retorno (el campeonato tiene datos reales)
+
+```bash
+# Copia consistente de la base (usa la API de respaldo de SQLite; la base está en modo WAL)
+docker exec pitazo-app python -c "import sqlite3; o=sqlite3.connect('/srv/backend/data/campeonato.db'); d=sqlite3.connect('/srv/backend/data/_tmp.db'); o.backup(d); d.close()"
+docker cp pitazo-app:/srv/backend/data/_tmp.db /opt/pitazo/backups/campeonato-$(date +%Y%m%d-%H%M).db
+docker exec pitazo-app rm -f /srv/backend/data/_tmp.db
+docker tag pitazo-pitazo-app:latest pitazo-pitazo-app:anterior      # imagen a la que volver
+```
+
+**Volver a la versión anterior** si algo falla:
+
+```bash
+cd /opt/pitazo && docker tag pitazo-pitazo-app:anterior pitazo-pitazo-app:latest
+docker compose up -d --no-build
+# si además hay que restaurar los datos: parar el contenedor y reemplazar campeonato.db del volumen
+# pitazo_data por el respaldo de /opt/pitazo/backups
+```
+
 ## Una sola vez: bloque en el Caddyfile del inventario
 
 Se agregó al final de `/opt/Sistema-Inventario/Caddyfile` (con copia `Caddyfile.bak-*` al lado):
