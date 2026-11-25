@@ -122,10 +122,10 @@ function NuevoPartido({ onClose }: { onClose: () => void }) {
   )
 }
 
-function Tarjeta({ p, onDelete }: { p: PartidoResumen; onDelete: () => void }) {
+function Tarjeta({ p, mio, onDelete }: { p: PartidoResumen; mio?: boolean; onDelete: () => void }) {
   const { esAdmin, puedeOperar } = useAuth()
   return (
-    <div className="card flex flex-wrap items-center gap-3">
+    <div className={clsx('card flex flex-wrap items-center gap-3', mio && 'ring-2 ring-emerald-400')}>
       <Link to={`/partidos/${p.id}`} className="min-w-[240px] flex-1">
         <div className="flex items-center gap-3 text-base font-bold">
           <span className="flex-1 text-right">{p.local}</span>
@@ -134,6 +134,7 @@ function Tarjeta({ p, onDelete }: { p: PartidoResumen; onDelete: () => void }) {
           </span>
           <span className="flex-1">{p.visitante}</span>
         </div>
+        {mio && <div className="mt-1 text-center"><span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">TU EQUIPO</span></div>}
         <div className="mt-1 text-center text-xs text-slate-500">
           {p.categoria && <b>{p.categoria} · </b>}<b>{p.fase_nombre}</b> · {fmtFecha(p.fecha)} {p.hora ?? ''} {p.cancha && `· ${p.cancha}`} {p.jornada && `· ${p.jornada}`}
         </div>
@@ -142,7 +143,7 @@ function Tarjeta({ p, onDelete }: { p: PartidoResumen; onDelete: () => void }) {
         p.estado === 'en_juego' ? 'bg-emerald-100 text-emerald-800' : p.estado === 'finalizado' ? 'bg-slate-200 text-slate-600' : 'bg-amber-100 text-amber-800')}>
         {p.estado === 'en_juego' ? `● ${p.periodo}º tiempo` : ETIQUETA[p.estado]}
       </span>
-      <Link to={`/partidos/${p.id}`} className="btn btn-pri">{p.estado === 'finalizado' || !puedeOperar ? 'Ver' : p.estado === 'en_juego' ? 'Continuar' : 'Abrir'}</Link>
+      <Link to={`/partidos/${p.id}`} className="btn btn-pri">{!puedeOperar ? (p.estado === 'en_juego' ? 'Ver en vivo' : 'Ver') : p.estado === 'finalizado' ? 'Ver' : p.estado === 'en_juego' ? 'Continuar' : 'Abrir'}</Link>
       {esAdmin && <button className="btn btn-sec" title="Eliminar" onClick={onDelete}><Trash2 size={16} /></button>}
     </div>
   )
@@ -150,7 +151,7 @@ function Tarjeta({ p, onDelete }: { p: PartidoResumen; onDelete: () => void }) {
 
 export default function PartidosPage() {
   const qc = useQueryClient()
-  const { esAdmin } = useAuth()
+  const { esAdmin, esDelegado, user } = useAuth()
   const [modal, setModal] = useState(false)
   const { data: partidos = [], isLoading } = useQuery({
     queryKey: ['partidos'],
@@ -166,10 +167,17 @@ export default function PartidosPage() {
     if (confirm(`¿Eliminar el partido ${p.local} vs ${p.visitante}? Se perderán sus eventos.`)) del.mutate(p.id)
   }
 
+  // Un delegado ve primero los partidos de SU equipo; el resto son los de su categoría (solo lectura).
+  const esMio = (p: PartidoResumen) => !!user && (user.equipo_ids.includes(p.local_id) || user.equipo_ids.includes(p.visitante_id))
+  const mios = esDelegado ? partidos.filter(esMio) : []
+  const resto = esDelegado ? partidos.filter((p) => !esMio(p)) : partidos
+  const orden = { en_juego: 0, programado: 1, finalizado: 2 } as const
+  const sufijo = esDelegado ? ' de mi categoría' : ''
   const grupos: [string, PartidoResumen[]][] = [
-    ['En juego', partidos.filter((p) => p.estado === 'en_juego')],
-    ['Programados', partidos.filter((p) => p.estado === 'programado')],
-    ['Finalizados', partidos.filter((p) => p.estado === 'finalizado').reverse()],
+    ...(esDelegado ? [['Mis partidos', [...mios].sort((a, b) => orden[a.estado] - orden[b.estado])] as [string, PartidoResumen[]]] : []),
+    [`En juego${sufijo}`, resto.filter((p) => p.estado === 'en_juego')],
+    [`Programados${sufijo}`, resto.filter((p) => p.estado === 'programado')],
+    [`Finalizados${sufijo}`, resto.filter((p) => p.estado === 'finalizado').reverse()],
   ]
 
   return (
@@ -188,7 +196,7 @@ export default function PartidosPage() {
         lista.length ? (
           <section key={titulo} className="space-y-2">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{titulo} ({lista.length})</h3>
-            {lista.map((p) => <Tarjeta key={p.id} p={p} onDelete={() => borrar(p)} />)}
+            {lista.map((p) => <Tarjeta key={p.id} p={p} mio={esDelegado && esMio(p)} onDelete={() => borrar(p)} />)}
           </section>
         ) : null,
       )}

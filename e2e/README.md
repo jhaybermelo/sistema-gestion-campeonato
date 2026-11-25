@@ -17,6 +17,7 @@ ADMIN_PASSWORD=Prueba-1234 node movil.mjs   # 17 vistas x 3 tamaños: desbordes,
 ADMIN_PASSWORD=Prueba-1234 node login.mjs   # login, roles y permisos
 ADMIN_PASSWORD=Prueba-1234 node delegado.mjs # rol delegado: planilla de 12, cierre, solo lectura, rankings
 ADMIN_PASSWORD=Prueba-1234 node amf.mjs      # reglas AMF: tiempo muerto, descanso, 5 faltas = azul
+ADMIN_PASSWORD=Prueba-1234 node delegado-partido.mjs # el delegado ve en vivo el partido de su equipo, sin poder actuar
 ```
 
 Cada ejecución crea datos de prueba: **borra `backend/data/e2e.db*` antes de repetir**.
