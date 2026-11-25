@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import clsx from 'clsx'
 import { api, errorToast, fmtFecha, fmtTiempo } from '../api/client'
 import { useAuth } from '../auth'
-import { EVENTO } from '../eventos'
+import { EVENTO, MOTIVO } from '../eventos'
 import type { JugadorPlanilla, LadoPartido, PartidoDetalle, TipoEvento } from '../types'
 
 function pitido() {
@@ -50,6 +50,30 @@ function useReloj(p: PartidoDetalle | undefined, alAgotar: () => void) {
   return restante
 }
 
+/** Cuenta regresiva local (descanso, tiempo muerto) anclada al valor que informa el servidor. */
+function useCuenta(inicial: number | null | undefined, clave: unknown) {
+  const [anchor, setAnchor] = useState({ v: 0, at: performance.now() })
+  const [now, setNow] = useState(performance.now())
+  const activo = inicial != null
+  useEffect(() => {
+    setAnchor({ v: inicial ?? 0, at: performance.now() })
+    setNow(performance.now())
+  }, [inicial, clave])
+  useEffect(() => {
+    if (!activo) return
+    const t = setInterval(() => setNow(performance.now()), 250)
+    return () => clearInterval(t)
+  }, [activo])
+  const restante = activo ? Math.max(0, anchor.v - (now - anchor.at) / 1000) : null
+  // Pitido una sola vez cuando la cuenta llega a 0 (no al cargar la página con la cuenta ya terminada).
+  const previo = useRef<number | null>(null)
+  useEffect(() => {
+    if (previo.current !== null && previo.current > 0 && restante === 0) pitido()
+    previo.current = restante
+  }, [restante])
+  return restante
+}
+
 function Chip({ children, className }: { children: React.ReactNode; className: string }) {
   return <span className={clsx('rounded px-1.5 py-0.5 text-xs font-bold', className)}>{children}</span>
 }
@@ -82,12 +106,14 @@ interface PanelProps {
   lado: LadoPartido
   activo: boolean
   lectura: boolean // el delegado solo consulta
+  tmUsado: boolean // ya usó su tiempo muerto en este periodo
+  onTiempoMuerto: () => void
   onEvento: (tipo: TipoEvento, equipoId: number, j: JugadorPlanilla | null) => void
   onConvocar: (pjId: number, v: boolean) => void
   onAgregar: (d: object) => void
 }
 
-function PanelEquipo({ p, lado, activo, lectura, onEvento, onConvocar, onAgregar }: PanelProps) {
+function PanelEquipo({ p, lado, activo, lectura, tmUsado, onTiempoMuerto, onEvento, onConvocar, onAgregar }: PanelProps) {
   const [editando, setEditando] = useState(false)
   const [nuevo, setNuevo] = useState(false)
   const faltas = lado.faltas[String(p.periodo)] ?? 0
@@ -100,35 +126,37 @@ function PanelEquipo({ p, lado, activo, lectura, onEvento, onConvocar, onAgregar
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-lg font-bold">{lado.nombre}</h3>
         <div className={clsx('rounded-lg px-3 py-1 text-sm font-semibold', limite ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600')}>
-          Faltas {p.periodo}º T: {faltas}/{p.limite_faltas} {limite && '⚠'}
+          Faltas {p.periodo}º T: {faltas}/{p.limite_faltas}
+          {faltas > p.limite_faltas ? ' · sin barrera 🚫' : limite ? ' · la próxima: sin barrera ⚠' : ''}
         </div>
       </div>
 
       <div className="space-y-1">
         {lista.map((j) => (
-          <div key={j.id} className={clsx('flex flex-wrap items-center gap-1.5 rounded-lg border-b border-slate-100 px-1 py-1.5', j.expulsado && 'bg-red-50', !j.convocado && 'opacity-50')}>
+          <div key={j.id} className={clsx('flex flex-wrap items-center gap-1.5 rounded-lg border-b border-slate-100 px-1 py-1.5', j.fuera && 'bg-red-50', !j.convocado && 'opacity-50')}>
             {editando && (
               <input type="checkbox" className="h-5 w-5 accent-emerald-600" checked={j.convocado} onChange={(e) => onConvocar(j.id, e.target.checked)} />
             )}
             <span className="w-8 text-center text-lg font-extrabold text-emerald-700">{j.numero}</span>
-            <span className={clsx('min-w-[100px] flex-1 font-medium', j.expulsado && 'text-slate-400 line-through')}>
+            <span className={clsx('min-w-[100px] flex-1 font-medium', j.fuera && 'text-slate-400 line-through')}>
               {j.nombre}
               <span className="ml-1 inline-flex gap-1 align-middle">
                 {j.goles > 0 && <Chip className="bg-slate-900 text-white">⚽{j.goles}</Chip>}
                 {j.amarillas > 0 && <Chip className="bg-yellow-300 text-yellow-900">{j.amarillas}</Chip>}
                 {j.azules > 0 && <Chip className="bg-blue-500 text-white">{j.azules}</Chip>}
                 {j.rojas > 0 && <Chip className="bg-red-600 text-white">{j.rojas}</Chip>}
-                {j.faltas > 0 && <Chip className="bg-slate-200 text-slate-700">F{j.faltas}</Chip>}
+                {j.faltas > 0 && <Chip className={j.faltas >= 4 ? 'bg-amber-300 text-amber-900' : 'bg-slate-200 text-slate-700'}>F{j.faltas}</Chip>}
+                {j.fuera && <Chip className="bg-red-600 text-white">FUERA</Chip>}
               </span>
             </span>
             {!editando && !lectura && (
               <div className="grid w-full grid-cols-6 gap-1.5 sm:flex sm:w-auto sm:gap-1">
-                <button disabled={!activo} title="Gol" className={clsx(btn, 'bg-slate-900 text-white')} onClick={() => onEvento('gol', lado.id, j)}>⚽</button>
-                <button disabled={!activo} title="Falta" className={clsx(btn, 'bg-slate-200 text-slate-700')} onClick={() => onEvento('falta', lado.id, j)}>F</button>
-                <button disabled={!activo} title="Tarjeta amarilla" className={clsx(btn, 'bg-yellow-300 text-yellow-900')} onClick={() => onEvento('amarilla', lado.id, j)}>A</button>
-                <button disabled={!activo} title="Tarjeta azul" className={clsx(btn, 'bg-blue-500 text-white')} onClick={() => onEvento('azul', lado.id, j)}>Az</button>
-                <button disabled={!activo} title="Tarjeta roja" className={clsx(btn, 'bg-red-600 text-white')} onClick={() => onEvento('roja', lado.id, j)}>R</button>
-                <button disabled={!activo} title="Autogol" className={clsx(btn, 'bg-white text-slate-500 ring-1 ring-slate-300 !text-xs')} onClick={() => onEvento('autogol', lado.id, j)}>AG</button>
+                <button disabled={!activo || j.fuera} title="Gol" className={clsx(btn, 'bg-slate-900 text-white')} onClick={() => onEvento('gol', lado.id, j)}>⚽</button>
+                <button disabled={!activo || j.fuera} title="Falta" className={clsx(btn, 'bg-slate-200 text-slate-700')} onClick={() => onEvento('falta', lado.id, j)}>F</button>
+                <button disabled={!activo || j.fuera} title="Tarjeta amarilla" className={clsx(btn, 'bg-yellow-300 text-yellow-900')} onClick={() => onEvento('amarilla', lado.id, j)}>A</button>
+                <button disabled={!activo || j.fuera} title="Tarjeta azul" className={clsx(btn, 'bg-blue-500 text-white')} onClick={() => onEvento('azul', lado.id, j)}>Az</button>
+                <button disabled={!activo || j.fuera} title="Tarjeta roja" className={clsx(btn, 'bg-red-600 text-white')} onClick={() => onEvento('roja', lado.id, j)}>R</button>
+                <button disabled={!activo || j.fuera} title="Autogol" className={clsx(btn, 'bg-white text-slate-500 ring-1 ring-slate-300 !text-xs')} onClick={() => onEvento('autogol', lado.id, j)}>AG</button>
               </div>
             )}
           </div>
@@ -144,6 +172,11 @@ function PanelEquipo({ p, lado, activo, lectura, onEvento, onConvocar, onAgregar
         {!editando && (
           <button disabled={!activo} className="btn btn-sec !py-2.5 sm:!py-1.5" onClick={() => onEvento('falta', lado.id, null)}>
             + Falta del equipo
+          </button>
+        )}
+        {!editando && (
+          <button disabled={!activo || tmUsado} className="btn btn-sec !py-2.5 sm:!py-1.5" onClick={onTiempoMuerto}>
+            ⏱ Tiempo muerto{tmUsado ? ' (usado)' : ''}
           </button>
         )}
         <button className="btn btn-sec !py-2.5 sm:!py-1.5" onClick={() => setEditando(!editando)}>
@@ -171,6 +204,8 @@ export default function PartidoLivePage() {
   })
 
   const restante = useReloj(p, () => qc.invalidateQueries({ queryKey: key }))
+  const descansoRest = useCuenta(p?.descanso?.restante_seg, p?.descanso ? p.periodo : null)
+  const tmRest = useCuenta(p?.tiempo_muerto?.restante_seg, p?.tiempo_muerto?.equipo_id)
 
   const alExito = (d: PartidoDetalle) => {
     qc.setQueryData(key, d)
@@ -201,7 +236,7 @@ export default function PartidoLivePage() {
       (await api.post<PartidoDetalle>(`/partidos/${id}/eventos`, { tipo: v.tipo, equipo_id: v.equipoId, pj_id: v.j?.id ?? null })).data,
     onSuccess: (d, v) => {
       alExito(d)
-      const ult = d.eventos[d.eventos.length - 1]
+      const ult = [...d.eventos].reverse().find((e) => !e.motivo) ?? d.eventos[d.eventos.length - 1]
       toast.custom(
         (t) => (
           <div className={clsx('flex items-center gap-3 rounded-lg bg-slate-900 px-4 py-2 text-white shadow-lg', t.visible ? 'animate-pulse' : '')}>
@@ -230,19 +265,28 @@ export default function PartidoLivePage() {
   const ultimoTiempo = p.periodo >= p.num_tiempos
   const pendiente = accion.isPending || evento.isPending
 
+  // Reglas AMF: el servidor genera la azul automática (5.ª falta, 2.ª amarilla) y bloquea al jugador fuera;
+  // aquí solo avisamos al planillero de lo que acaba de pasar.
   const registrar = (tipo: TipoEvento, equipoId: number, j: JugadorPlanilla | null) => {
-    if (j?.expulsado && tipo !== 'autogol' && !confirm(`${j.nombre} ya está expulsado. ¿Registrar de todas formas?`)) return
     evento.mutate({ tipo, equipoId, j }, {
       onSuccess: (d) => {
-        if (!j) return
-        const nj = [...d.local.jugadores, ...d.visitante.jugadores].find((x) => x.id === j.id)
-        if (nj?.expulsado && !j.expulsado) toast(`⚠ ${j.nombre} queda expulsado`, { icon: '🟥' })
+        const nj = j ? [...d.local.jugadores, ...d.visitante.jugadores].find((x) => x.id === j.id) : undefined
+        if (j && nj) {
+          if (nj.fuera && !j.fuera) {
+            const porque = tipo === 'falta' ? '5.ª falta personal: tarjeta azul' : tipo === 'amarilla' ? '2.ª amarilla: tarjeta azul' : tipo === 'roja' ? 'tarjeta roja' : 'tarjeta azul'
+            toast(`#${j.numero} ${j.nombre} sale del partido (${porque}).${tipo === 'roja' ? '' : ' Sustitución obligatoria.'}`, { icon: '🟦', duration: 8000 })
+          } else if (tipo === 'falta' && nj.faltas === 4) {
+            toast(`#${j.numero} ${j.nombre} lleva 4 faltas: la próxima es azul y sale del partido`, { icon: '⚠️', duration: 6000 })
+          }
+        }
+        if (tipo === 'falta') {
+          const lado = equipoId === d.local.id ? d.local : d.visitante
+          const n = lado.faltas[String(d.periodo)] ?? 0
+          if (n === d.limite_faltas) toast(`${lado.nombre} llegó a ${n} faltas en este tiempo: la próxima es tiro libre sin barrera`, { icon: '⚠️', duration: 7000 })
+          else if (n > d.limite_faltas) toast(`Falta ${n} de ${lado.nombre}: tiro libre sin barrera`, { icon: '🚫', duration: 7000 })
+        }
       },
     })
-    if (tipo === 'falta') {
-      const lado = equipoId === p.local.id ? p.local : p.visitante
-      if ((lado.faltas[String(p.periodo)] ?? 0) + 1 === p.limite_faltas) toast(`${lado.nombre} alcanzó el límite de faltas`, { icon: '⚠️', duration: 5000 })
-    }
   }
 
   const ajustar = () => {
@@ -275,6 +319,32 @@ export default function PartidoLivePage() {
           {fmtTiempo(restante)}
         </div>
 
+        {p.descanso && enJuego && (
+          <div className="mt-3 rounded-xl bg-amber-400/15 p-3 text-center ring-1 ring-amber-400/40">
+            <div className="text-xs font-bold tracking-widest text-amber-300">DESCANSO</div>
+            <div className="font-mono text-5xl font-extrabold tabular-nums text-amber-300">{fmtTiempo(descansoRest ?? 0)}</div>
+            <div className="text-xs text-amber-200/80">
+              {(descansoRest ?? 0) <= 0 ? 'Descanso terminado: inicia el siguiente tiempo' : 'Los equipos cambian de mitad de campo'}
+            </div>
+          </div>
+        )}
+        {p.tiempo_muerto && (
+          <div className="mt-3 rounded-xl bg-sky-400/15 p-3 text-center ring-1 ring-sky-400/40">
+            <div className="text-xs font-bold tracking-widest text-sky-300">
+              ⏱ TIEMPO MUERTO · {(p.tiempo_muerto.equipo_id === p.local.id ? p.local : p.visitante).nombre}
+            </div>
+            <div className="font-mono text-5xl font-extrabold tabular-nums text-sky-300">{fmtTiempo(tmRest ?? 0)}</div>
+            <div className="text-xs text-sky-200/80">
+              {(tmRest ?? 0) <= 0 ? 'Tiempo muerto terminado: reanuda el juego' : 'El cronómetro está detenido'}
+            </div>
+            {puedeOperar && (
+              <button className="btn mt-2 bg-white/10 text-white hover:bg-white/20" onClick={() => accion.mutate({ ruta: 'tiempo-muerto/terminar' })}>
+                Terminar tiempo muerto
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           {puedeOperar && p.estado === 'programado' && (
             <button className="btn btn-pri !px-8 !py-3 !text-lg" disabled={pendiente} onClick={() => accion.mutate({ ruta: 'iniciar' })}><Play size={22} /> Iniciar partido</button>
@@ -284,6 +354,9 @@ export default function PartidoLivePage() {
           )}
           {puedeOperar && enJuego && !p.corriendo && !sinTiempo && (
             <button className="btn btn-pri !px-8 !py-3 !text-lg" disabled={pendiente} onClick={() => accion.mutate({ ruta: 'iniciar' })}><Play size={22} /> Reanudar</button>
+          )}
+          {puedeOperar && enJuego && !p.corriendo && !ultimoTiempo && sinTiempo && !p.descanso && (
+            <button className="btn bg-white/10 text-white hover:bg-white/20" disabled={pendiente} onClick={() => accion.mutate({ ruta: 'descanso' })}>Iniciar descanso</button>
           )}
           {puedeOperar && enJuego && !p.corriendo && !ultimoTiempo && (
             <button className={clsx('btn !py-3', sinTiempo ? 'btn-pri !px-6 !text-lg' : 'bg-white/10 text-white hover:bg-white/20')} disabled={pendiente}
@@ -316,6 +389,7 @@ export default function PartidoLivePage() {
         {[p.local, p.visitante].map((l) => (
           <PanelEquipo
             key={l.id} p={p} lado={l} activo={enJuego && puedeOperar} lectura={!puedeOperar}
+            tmUsado={!!l.tiempos_muertos[String(p.periodo)]} onTiempoMuerto={() => registrar('tiempo_muerto', l.id, null)}
             onEvento={registrar}
             onConvocar={(pjId, v) => convocar.mutate({ pjId, v })}
             onAgregar={(d) => agregar.mutate(d)}
@@ -333,9 +407,9 @@ export default function PartidoLivePage() {
             return (
               <div key={ev.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-2 text-sm">
                 <span className="w-20 shrink-0 font-mono text-slate-500">{ev.periodo}T {fmtTiempo(ev.segundo)}</span>
-                <span className="font-medium sm:w-40">{EVENTO[ev.tipo].icono} {EVENTO[ev.tipo].nombre}</span>
+                <span className="font-medium sm:w-56">{EVENTO[ev.tipo].icono} {EVENTO[ev.tipo].nombre}{ev.motivo && <span className="ml-1 text-xs font-normal text-slate-500">({MOTIVO[ev.motivo]})</span>}</span>
                 <span className="order-3 basis-full sm:order-none sm:basis-auto sm:flex-1">{ev.nombre ? `#${ev.numero} ${ev.nombre}` : '(equipo)'} <span className="text-slate-400">— {equipo}</span></span>
-                {!fin && puedeOperar && (
+                {!fin && puedeOperar && !ev.motivo && (
                   <button title="Eliminar evento" className="order-2 ml-auto flex h-10 w-10 items-center justify-center rounded text-red-500 hover:bg-red-50 sm:order-none sm:h-8 sm:w-8"
                     onClick={() => confirm('¿Eliminar este evento?') && deshacer.mutate(ev.id)}><X size={16} /></button>
                 )}

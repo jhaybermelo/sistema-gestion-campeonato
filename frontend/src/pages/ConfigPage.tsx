@@ -51,8 +51,9 @@ export default function ConfigPage() {
           {num('pts_empate', 'Puntos por empatar')}
           {num('pts_perdido', 'Puntos por perder')}
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {num('max_jugadores', 'Jugadores por planilla')}
+          {num('descanso_min', 'Descanso entre tiempos (min)')}
           <div>
             <label className="lbl">Goleador cuenta desde</label>
             <select className="input" value={f.fase_goleador} onChange={(e) => setF({ ...f, fase_goleador: e.target.value })}>

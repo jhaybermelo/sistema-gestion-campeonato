@@ -24,11 +24,19 @@ def _migrar(conn):
     nuevas = {
         "equipos": [("categoria_id", "INTEGER REFERENCES categorias(id)")],
         "jugadores": [("anio_nacimiento", "INTEGER")],
-        "partidos": [("fase", "VARCHAR(20) NOT NULL DEFAULT 'grupos'")],
+        "partidos": [
+            ("fase", "VARCHAR(20) NOT NULL DEFAULT 'grupos'"),
+            ("descanso_seg", "INTEGER NOT NULL DEFAULT 600"),
+            ("descanso_desde", "TIMESTAMP"),
+            ("tm_equipo_id", "INTEGER"),
+            ("tm_desde", "TIMESTAMP"),
+        ],
+        "eventos": [("motivo", "VARCHAR(20)")],
         "config": [
             ("max_jugadores", "INTEGER NOT NULL DEFAULT 12"),
             ("fase_goleador", "VARCHAR(20) NOT NULL DEFAULT 'grupos'"),
             ("fase_valla", "VARCHAR(20) NOT NULL DEFAULT 'semifinal'"),
+            ("descanso_min", "INTEGER NOT NULL DEFAULT 10"),
         ],
     }
     for tabla, cols in nuevas.items():

@@ -22,6 +22,7 @@ class ConfigIn(In):
     max_jugadores: int = Field(12, ge=5, le=30)
     fase_goleador: Fase = "grupos"
     fase_valla: Fase = "semifinal"
+    descanso_min: int = Field(10, ge=1, le=30)
 
 
 class CategoriaIn(In):
@@ -70,7 +71,7 @@ class PartidoEdit(In):
 
 
 class EventoIn(In):
-    tipo: Literal["gol", "autogol", "amarilla", "azul", "roja", "falta"]
+    tipo: Literal["gol", "autogol", "amarilla", "azul", "roja", "falta", "tiempo_muerto"]
     equipo_id: int
     pj_id: int | None = None
 

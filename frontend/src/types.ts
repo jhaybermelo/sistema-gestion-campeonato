@@ -1,5 +1,5 @@
 export type Estado = 'programado' | 'en_juego' | 'finalizado'
-export type TipoEvento = 'gol' | 'autogol' | 'amarilla' | 'azul' | 'roja' | 'falta'
+export type TipoEvento = 'gol' | 'autogol' | 'amarilla' | 'azul' | 'roja' | 'falta' | 'tiempo_muerto'
 
 export interface Config {
   nombre: string
@@ -10,6 +10,7 @@ export interface Config {
   pts_empate: number
   pts_perdido: number
   max_jugadores: number
+  descanso_min: number
   fase_goleador: string
   fase_valla: string
   fases: { id: string; nombre: string }[]
@@ -83,7 +84,9 @@ export interface JugadorPlanilla {
   azules: number
   rojas: number
   faltas: number
-  expulsado: boolean
+  expulsado: boolean // roja
+  fuera: boolean // roja o azul: no puede volver a actuar
+  salida: 'roja' | 'azul' | null
 }
 
 export interface LadoPartido {
@@ -91,6 +94,7 @@ export interface LadoPartido {
   nombre: string
   delegado: string
   faltas: Record<string, number>
+  tiempos_muertos: Record<string, boolean>
   limita_anio: boolean
   anio_minimo: number | null
   jugadores: JugadorPlanilla[]
@@ -106,6 +110,7 @@ export interface EventoPartido {
   nombre: string | null
   periodo: number
   segundo: number
+  motivo: 'quinta_falta' | 'doble_amarilla' | null
 }
 
 export interface PartidoDetalle {
@@ -124,6 +129,8 @@ export interface PartidoDetalle {
   restante_seg: number
   corriendo: boolean
   limite_faltas: number
+  descanso: { restante_seg: number; duracion_seg: number; terminado: boolean } | null
+  tiempo_muerto: { equipo_id: number; restante_seg: number; terminado: boolean } | null
   nombre_campeonato: string
   goles_local: number
   goles_visitante: number

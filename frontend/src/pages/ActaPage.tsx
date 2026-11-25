@@ -2,7 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Printer } from 'lucide-react'
 import { api, fmtFecha, fmtTiempo } from '../api/client'
-import { EVENTO } from '../eventos'
+import { EVENTO, MOTIVO } from '../eventos'
 import type { LadoPartido, PartidoDetalle } from '../types'
 
 function Planilla({ lado, p }: { lado: LadoPartido; p: PartidoDetalle }) {
@@ -32,6 +32,7 @@ function Planilla({ lado, p }: { lado: LadoPartido; p: PartidoDetalle }) {
       </table></div>
       <p className="mt-1 text-xs">
         Faltas por tiempo: {Array.from({ length: p.num_tiempos }, (_, i) => `${i + 1}º T: ${lado.faltas[String(i + 1)] ?? 0}`).join('  ·  ')}
+        {' · '}Tiempos muertos: {Array.from({ length: p.num_tiempos }, (_, i) => `${i + 1}º T: ${lado.tiempos_muertos[String(i + 1)] ? 'sí' : 'no'}`).join('  ·  ')}
       </p>
     </section>
   )
@@ -66,7 +67,7 @@ export default function ActaPage() {
             {p.eventos.map((ev) => (
               <tr key={ev.id}>
                 <td className={`${celda} text-center`}>{ev.periodo}T {fmtTiempo(ev.segundo)}</td>
-                <td className={celda}>{EVENTO[ev.tipo].icono} {EVENTO[ev.tipo].nombre}</td>
+                <td className={celda}>{EVENTO[ev.tipo].icono} {EVENTO[ev.tipo].nombre}{ev.motivo && ` (${MOTIVO[ev.motivo]})`}</td>
                 <td className={celda}>{ev.nombre ? `#${ev.numero} ${ev.nombre}` : ''}</td>
                 <td className={celda}>{ev.equipo_id === p.local.id ? p.local.nombre : p.visitante.nombre}</td>
               </tr>

@@ -56,6 +56,11 @@ async def detalle(db: AsyncSession, p: Partido) -> dict:
         if ev.tipo == "falta":
             faltas[ev.equipo_id][str(ev.periodo)] += 1
     pj_by_id = {x.id: x for x in pjs}
+    # Tiempos muertos usados: {equipo_id: {periodo: True}} (AMF: 1 por periodo, no acumulable)
+    tm_usados: dict[int, dict[str, bool]] = defaultdict(dict)
+    for ev in evs:
+        if ev.tipo == "tiempo_muerto":
+            tm_usados[ev.equipo_id][str(ev.periodo)] = True
     cats = {c.id: c for c in (await db.execute(select(Categoria))).scalars()}
 
     def lado(eid: int) -> dict:
@@ -70,12 +75,16 @@ async def detalle(db: AsyncSession, p: Partido) -> dict:
                 "documento": x.documento, "convocado": x.convocado,
                 "goles": c["gol"], "autogoles": c["autogol"], "amarillas": c["amarilla"],
                 "azules": c["azul"], "rojas": c["roja"], "faltas": c["falta"],
-                "expulsado": c["roja"] > 0 or c["amarilla"] >= 2,
+                # Fuera del partido: roja (expulsión) o azul (sustitución obligatoria: 5.ª falta, doble amarilla
+                # o azul directa). En ambos casos el jugador no puede volver a actuar.
+                "expulsado": c["roja"] > 0,
+                "fuera": c["roja"] > 0 or c["azul"] > 0,
+                "salida": "roja" if c["roja"] > 0 else ("azul" if c["azul"] > 0 else None),
             })
         cat = cats.get(e.categoria_id)
         return {
             "id": e.id, "nombre": e.nombre, "delegado": e.delegado,
-            "faltas": dict(faltas[eid]), "jugadores": jug,
+            "faltas": dict(faltas[eid]), "tiempos_muertos": dict(tm_usados[eid]), "jugadores": jug,
             "limita_anio": bool(cat and cat.limita_anio and cat.anio_minimo),
             "anio_minimo": cat.anio_minimo if cat and cat.limita_anio else None,
         }
@@ -91,6 +100,8 @@ async def detalle(db: AsyncSession, p: Partido) -> dict:
         "periodo": p.periodo, "num_tiempos": p.num_tiempos, "duracion_seg": p.duracion_seg,
         "restante_seg": round(reloj.restante(p), 2), "corriendo": p.corriendo,
         "limite_faltas": cfg.limite_faltas,
+        "descanso": reloj.estado_descanso(p),
+        "tiempo_muerto": reloj.estado_tiempo_muerto(p),
         "nombre_campeonato": cfg.nombre,
         "goles_local": gl, "goles_visitante": gv,
         "local": lado(p.local_id), "visitante": lado(p.visitante_id),
@@ -99,9 +110,34 @@ async def detalle(db: AsyncSession, p: Partido) -> dict:
             "pj_id": ev.pj_id,
             "numero": pj_by_id[ev.pj_id].numero if ev.pj_id in pj_by_id else None,
             "nombre": pj_by_id[ev.pj_id].nombre if ev.pj_id in pj_by_id else None,
-            "periodo": ev.periodo, "segundo": ev.segundo,
+            "periodo": ev.periodo, "segundo": ev.segundo, "motivo": ev.motivo,
         } for ev in evs],
     }
+
+
+async def aplicar_reglas(db: AsyncSession, p: Partido, pj_id: int | None) -> None:
+    """Reglas automáticas de la AMF para un jugador (idempotente: deja el estado correcto
+    tanto al agregar como al quitar eventos):
+      - 5.ª falta personal  -> tarjeta azul (sustitución obligatoria). Las faltas se acumulan en todo el partido.
+      - 2.ª amarilla        -> tarjeta azul (la doble amonestación es descalificación con sustitución).
+    Si el evento que la originó se elimina, la azul automática también desaparece."""
+    if pj_id is None:
+        return
+    evs = list((await db.execute(
+        select(Evento).where(Evento.partido_id == p.id, Evento.pj_id == pj_id).order_by(Evento.id)
+    )).scalars())
+    for motivo, tipo, n in (("quinta_falta", "falta", 5), ("doble_amarilla", "amarilla", 2)):
+        base = [e for e in evs if e.tipo == tipo]
+        auto = [e for e in evs if e.tipo == "azul" and e.motivo == motivo]
+        if len(base) >= n and not auto:
+            origen = base[n - 1]
+            db.add(Evento(
+                partido_id=p.id, tipo="azul", motivo=motivo, equipo_id=origen.equipo_id, pj_id=pj_id,
+                periodo=origen.periodo, segundo=origen.segundo,
+            ))
+        elif len(base) < n:
+            for e in auto:
+                await db.delete(e)
 
 
 def _verificar_ambito(amb: set[int] | None, p: Partido) -> None:
@@ -187,7 +223,7 @@ async def crear_partido(data: PartidoIn, db: AsyncSession = Depends(get_db)):
     p = Partido(
         **data.model_dump(), estado="programado", periodo=1,
         duracion_seg=cfg.duracion_min * 60, num_tiempos=cfg.num_tiempos,
-        restante_seg=cfg.duracion_min * 60, corriendo=False,
+        restante_seg=cfg.duracion_min * 60, corriendo=False, descanso_seg=cfg.descanso_min * 60,
     )
     db.add(p)
     await db.flush()
@@ -250,6 +286,7 @@ async def iniciar(partido_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(400, "El tiempo terminó. Pasa al siguiente tiempo o finaliza el partido.")
     p.corriendo = True
     p.corriendo_desde = reloj.ahora()
+    p.tm_desde = p.tm_equipo_id = None  # al reanudar el juego termina el tiempo muerto
     return await _responder(db, p)
 
 
@@ -271,6 +308,7 @@ async def siguiente_tiempo(partido_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(400, "Ya estás en el último tiempo")
     p.periodo += 1
     p.restante_seg = p.duracion_seg
+    p.descanso_desde = p.tm_desde = p.tm_equipo_id = None  # termina el descanso
     return await _responder(db, p)
 
 
@@ -282,6 +320,29 @@ async def ajustar(partido_id: int, data: AjusteIn, db: AsyncSession = Depends(ge
     if p.estado == "finalizado":
         raise HTTPException(400, "El partido ya finalizó")
     p.restante_seg = min(data.restante_seg, p.duracion_seg)
+    if p.restante_seg <= 0:
+        reloj.iniciar_descanso(p)  # el periodo se da por terminado: arranca el descanso
+    else:
+        p.descanso_desde = None
+    return await _responder(db, p)
+
+
+@router.post("/partidos/{partido_id}/descanso", dependencies=[Depends(operador)])
+async def iniciar_descanso(partido_id: int, db: AsyncSession = Depends(get_db)):
+    """Arranca (o reinicia) el descanso a mano. Normalmente arranca solo al terminar el periodo."""
+    p = await _get(db, partido_id)
+    if p.estado != "en_juego" or p.corriendo:
+        raise HTTPException(400, "El descanso solo se puede iniciar con el partido en juego y el cronómetro detenido")
+    if p.periodo >= p.num_tiempos:
+        raise HTTPException(400, "Ya estás en el último tiempo: no hay descanso")
+    reloj.iniciar_descanso(p)
+    return await _responder(db, p)
+
+
+@router.post("/partidos/{partido_id}/tiempo-muerto/terminar", dependencies=[Depends(operador)])
+async def terminar_tiempo_muerto(partido_id: int, db: AsyncSession = Depends(get_db)):
+    p = await _get(db, partido_id)
+    p.tm_desde = p.tm_equipo_id = None
     return await _responder(db, p)
 
 
@@ -292,6 +353,7 @@ async def finalizar(partido_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(400, "El partido aún no se ha iniciado")
     reloj.congelar(p)
     p.estado = "finalizado"
+    p.descanso_desde = p.tm_desde = p.tm_equipo_id = None
     return await _responder(db, p)
 
 
@@ -352,11 +414,40 @@ async def registrar_evento(partido_id: int, data: EventoIn, db: AsyncSession = D
             raise HTTPException(400, "El jugador no está convocado en la planilla")
     elif data.tipo in ("amarilla", "azul", "roja", "autogol"):
         raise HTTPException(400, "Este evento requiere un jugador")
+
+    if data.tipo == "tiempo_muerto":
+        # AMF, Regla 6: un (1) minuto por equipo y por periodo; si no se usa en el primero no se acumula.
+        if data.pj_id is not None:
+            raise HTTPException(400, "El tiempo muerto es del equipo, no de un jugador")
+        if p.periodo > p.num_tiempos or reloj.restante(p) <= 0:
+            raise HTTPException(400, "El periodo terminó: no se puede pedir tiempo muerto")
+        usado = (await db.execute(
+            select(Evento.id).where(
+                Evento.partido_id == partido_id, Evento.tipo == "tiempo_muerto",
+                Evento.equipo_id == data.equipo_id, Evento.periodo == p.periodo,
+            ).limit(1)
+        )).first()
+        if usado:
+            raise HTTPException(409, f"Este equipo ya usó su tiempo muerto del {p.periodo}º tiempo (solo hay uno por periodo)")
+        reloj.congelar(p)  # el tiempo muerto detiene el cronómetro
+        p.tm_equipo_id, p.tm_desde = data.equipo_id, reloj.ahora()
+    elif data.pj_id is not None:
+        previos = (await db.execute(
+            select(Evento.tipo).where(Evento.partido_id == partido_id, Evento.pj_id == data.pj_id,
+                                      Evento.tipo.in_(["roja", "azul"]))
+        )).scalars().all()
+        if previos:
+            raise HTTPException(
+                409, f"{pj.nombre} ya está fuera del partido (tarjeta {'roja' if 'roja' in previos else 'azul'}). "
+                     "No puede registrar más acciones.")
+
     transcurrido = max(0, int(p.duracion_seg - reloj.restante(p)))
     db.add(Evento(
         partido_id=partido_id, tipo=data.tipo, equipo_id=data.equipo_id, pj_id=data.pj_id,
         periodo=p.periodo, segundo=transcurrido,
     ))
+    await db.flush()
+    await aplicar_reglas(db, p, data.pj_id)
     return await _responder(db, p)
 
 
@@ -366,5 +457,13 @@ async def eliminar_evento(partido_id: int, evento_id: int, db: AsyncSession = De
     ev = await db.get(Evento, evento_id)
     if not ev or ev.partido_id != partido_id:
         raise HTTPException(404, "Evento no encontrado")
+    if ev.motivo:
+        raise HTTPException(
+            400, "Esta tarjeta es automática: para quitarla elimina la falta o la amarilla que la originó")
+    pj_id, tipo, equipo_id = ev.pj_id, ev.tipo, ev.equipo_id
     await db.delete(ev)
+    await db.flush()
+    await aplicar_reglas(db, p, pj_id)
+    if tipo == "tiempo_muerto" and p.tm_equipo_id == equipo_id:
+        p.tm_desde = p.tm_equipo_id = None
     return await _responder(db, p)

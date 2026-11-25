@@ -55,7 +55,7 @@ with TestClient(app) as c:
     ok((p["goles_local"], p["goles_visitante"]) == (3, 1), f"marcador 3-1 ({p['goles_local']}-{p['goles_visitante']})")
     ev("amarilla", b["id"], j2)
     p = ev("amarilla", b["id"], j2)
-    ok([x for x in p["visitante"]["jugadores"] if x["id"] == j2][0]["expulsado"], "2 amarillas => expulsado")
+    ok([x for x in p["visitante"]["jugadores"] if x["id"] == j2][0]["fuera"], "2 amarillas => azul automática y jugador fuera (AMF)")
     for _ in range(3):
         p = ev("falta", a["id"])
     ok(p["local"]["faltas"].get("1") == 3, "faltas contadas por periodo")
@@ -68,7 +68,8 @@ with TestClient(app) as c:
     p = c.post(f"/api/partidos/{pid}/ajustar", json={"restante_seg": 0}).json()
     p = c.post(f"/api/partidos/{pid}/siguiente-tiempo").json()
     ok(p["periodo"] == 2 and p["restante_seg"] == 1200, "segundo tiempo con reloj reiniciado")
-    p = ev("gol", b["id"], j2)
+    j3 = p["visitante"]["jugadores"][0]["id"]  # j2 ya está fuera (doble amarilla): gol de otro jugador
+    p = ev("gol", b["id"], j3)
     ok(p["eventos"][-1]["periodo"] == 2, "evento guardado en el 2º tiempo")
 
     nuevo = c.post(f"/api/partidos/{pid}/planilla", json={"equipo_id": a["id"], "numero": 9, "nombre": "Nuevo"}).json()

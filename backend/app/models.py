@@ -45,6 +45,7 @@ class Config(Base):
     max_jugadores: Mapped[int] = mapped_column(Integer, default=12)  # tamaño de la planilla de cada equipo
     fase_goleador: Mapped[str] = mapped_column(String(20), default="grupos")  # el ranking cuenta desde esta fase
     fase_valla: Mapped[str] = mapped_column(String(20), default="semifinal")
+    descanso_min: Mapped[int] = mapped_column(Integer, default=10)  # descanso entre periodos (AMF: 10 min)
 
 
 class Categoria(Base):
@@ -95,6 +96,12 @@ class Partido(Base):
     restante_seg: Mapped[float] = mapped_column(Float)  # restante al momento de corriendo_desde
     corriendo: Mapped[bool] = mapped_column(Boolean, default=False)
     corriendo_desde: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Descanso entre periodos: arranca solo cuando el reloj llega a 0 (instante exacto en descanso_desde).
+    descanso_seg: Mapped[int] = mapped_column(Integer, default=600)
+    descanso_desde: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Tiempo muerto en curso (1 minuto); se limpia al reanudar el juego.
+    tm_equipo_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tm_desde: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class PartidoJugador(Base):
@@ -115,7 +122,9 @@ class Evento(Base):
     __tablename__ = "eventos"
     id: Mapped[int] = mapped_column(primary_key=True)
     partido_id: Mapped[int] = mapped_column(ForeignKey("partidos.id"), index=True)
-    tipo: Mapped[str] = mapped_column(String(10))  # gol|autogol|amarilla|azul|roja|falta
+    tipo: Mapped[str] = mapped_column(String(14))  # gol|autogol|amarilla|azul|roja|falta|tiempo_muerto
+    # Eventos automáticos de las reglas AMF: azul por 5.ª falta personal o por doble amarilla.
+    motivo: Mapped[str | None] = mapped_column(String(20), nullable=True)  # quinta_falta | doble_amarilla
     equipo_id: Mapped[int] = mapped_column(ForeignKey("equipos.id"))
     pj_id: Mapped[int | None] = mapped_column(ForeignKey("partido_jugadores.id"), nullable=True)
     periodo: Mapped[int] = mapped_column(Integer)
